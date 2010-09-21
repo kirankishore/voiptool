@@ -47,8 +47,7 @@ void VoIPSink::initialize()
 	degenerated = fopen(degeneratedWavFileName, "ab");
 	if((original == NULL) || (degenerated == NULL))
 	{
-		perror("Open file for writing failed! System error ");
-		exit(-1);
+		error("Open file for writing failed! System error ");
 	}
 	packet.data = NULL;
 	bindToPort(localPort);
@@ -59,7 +58,7 @@ void VoIPSink::handleMessage(cMessage *msg)
 	VoIP_fileList *traceList=NULL;
 	VoIP_fileEntry *pkt=NULL;
 	traceList = VoIPGenerator::getList();
-	switch(msg->kind())
+	switch(msg->getKind())
 	{
 		case SINK_INIT_TRG:
 			pkt = traceList->getPacket(pktno);
@@ -82,14 +81,14 @@ void VoIPSink::handleMessage2(cMessage *msg)
 	
 	traceList = VoIPGenerator::getList();
 	
-	ip = (IpPacket *)(msg->decapsulate());
+	ip = (IpPacket *)(PK(msg)->decapsulate());
 	delete msg;
 	if(ip == NULL)
 	{
 		ev << "Sink: Unknown Packet received!" << endl;
 		return;
 	}
-	switch(ip->kind())
+	switch(ip->getKind())
 	{
 		case VOIP:
 			ev << "Sink: VoIP Packet received!" << endl;
@@ -128,7 +127,7 @@ void VoIPSink::handleMessage2(cMessage *msg)
 			{
 				ev << "Errorflag: 1!" << endl;
 				transmissionErrors++;
-				pkt->setError(true);
+				pkt->setBitErrorRate(true);
 				// in case of an transmission error, silence is inserted into the output. There might be
 				// smarter algorithms to hide those errors, but this is not part of this simple demonstration
 				for(int i=psamples; i<(psamples+samplesPerPacket); i++) samples[i]=0;
@@ -307,14 +306,12 @@ void VoIPSink::initializeAudio()
 	// open input file
 	if(av_open_input_file(&pFormatCtx, cur_file, NULL, 0, NULL)!=0)
 	{
-		perror("Open of audio file failed!!\n");
-		exit(-1);
+		error("Open of audio file failed!!\n");
 	}
 	// detect file format
 	if(av_find_stream_info(pFormatCtx)<0)
 	{
-		perror("Invalid audio file!\n");
-		exit(-1);
+		error("Invalid audio file!\n");
 	}
 	
 	//search for audio stream (important with file formats which support several streams, like .avi for example)
@@ -415,7 +412,8 @@ void VoIPSink::finish()
 {
 	struct stat statbuf;
 	ev << "Sink finish()" << endl;
-	char command[1000], *last;
+	char command[1000];
+	const char *last;
 	double pesqValue;
 	int len;
 	FILE *in;
@@ -425,7 +423,7 @@ void VoIPSink::finish()
 	correctWavHeader(originalWavFileName);
 	correctWavHeader(degeneratedWavFileName);
 	result = fopen(resultFile, "at");
-	sprintf(command, "[Run %d]\n", simulation.runNumber());
+	sprintf(command, "[Run %s %d]\n", ev.getConfigEx()->getActiveConfigName(), ev.getConfigEx()->getActiveRunNumber());
 	fputs(command, result);
 	sprintf(command, "total number of VoIP packets:\t%d\n", pktno);
 	fputs(command, result);
@@ -439,9 +437,7 @@ void VoIPSink::finish()
 	{
 		if(stat("pesq", &statbuf) != 0) // Check if file exists
 		{
-			perror("computePesqValue is enabled, but an error occured ");
-			fclose(result);
-			return;
+			error("computePesqValue is enabled, but an error occured ");
 		}
 		strcpy(command, "./pesq +8000 ");
 		strcat(command, originalWavFileName);

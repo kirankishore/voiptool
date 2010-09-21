@@ -49,7 +49,7 @@ void VoIPGenerator::initialize(int stage)
     codingRate = par("codingRate");
     intArrTime = (double)samplesPerPacket / 8000.0;
     ev << "interArrivalTime: a packet is send every " << intArrTime*1000.0 << "ms!" << endl;
-    voipPktSize = voipHeaderSize + (int)(intArrTime * (double)codingRate);
+    voipPktSize = voipHeaderSize + (int)SIMTIME_DBL(intArrTime * (double)codingRate);
     ev << "voip Pkt size in Bits: " << voipPktSize <<endl;
     voipSilenceSize = voipHeaderSize;
     voipSilenceThreshold = par("voipSilenceThreshold");
@@ -61,7 +61,7 @@ void VoIPGenerator::initialize(int stage)
     localPort = par("localPort");
     destPort = par("destPort");
     //I need to cheat a little bit to access the "General" section of the omnetpp.ini :P
-    simTimeLimit = (int)ev.config()->getAsInt("General", "sim-time-limit", 0);
+    simTimeLimit = 100.0; //FIXME do not use simtime limit!
 
 
     // initialize pointer to character array used for int-char[] conversions
@@ -76,21 +76,18 @@ void VoIPGenerator::initialize(int stage)
     sound = opendir(soundFileDir);
     if(sound == NULL)
     {
-	    perror("An Error has occured while reading the wav dir ");
-	    exit(-1);
+	    error("An Error has occured while reading the wav dir ");
     }
     closedir(sound);
     // dir is readable - start scanning for .wav files
     noWavFiles = scandir(soundFileDir, &namelist, filter, alphasort);
     if(noWavFiles < 0)            //this case shouldn't happen
     {
-	    perror("Error scanning wav-dir for entries");
-	    exit(-2);
+	    error("Error scanning wav-dir for entries");
     }
     if(noWavFiles == 0)       // no matching files found...
     {
-	    cerr << "No wav Files found!" << endl;
-	    exit(-2);
+	    error("No wav Files found!");
     }
 
     //extract the needed infos (like length, sampling rate, etc) into a readable structure
@@ -113,7 +110,7 @@ void VoIPGenerator::initialize(int stage)
     }
     */
 
-    traceList = generateTrace((double)simTimeLimit + 0.5);
+    traceList = generateTrace(simTimeLimit + 0.5);
 
 
        // create a triggering message
@@ -135,12 +132,12 @@ void VoIPGenerator::handleMessage(cMessage *msg)
 {
     // create an IP message
     IpPacket *ip;
-    cMessage *enc;
+    cPacket *enc;
     VoIP_fileEntry *pkt;
     IPvXAddress dest;
 
     // switch between different kinds of messages
-    switch(msg->kind())
+    switch(msg->getKind())
     {
       // a selfmessage triggering a VOIP packet to be sent
       case SRC_VOIP_TRG:
@@ -155,13 +152,12 @@ void VoIPGenerator::handleMessage(cMessage *msg)
          traceList->next();
 
          // Length in Bits !
-	 ip->setLength(pkt->getSize());
+	 ip->setBitLength(pkt->getSize());
 
          //Type: VoIP / Silence
          ip->setType(pkt->getPacketType());
          ip->setName(itoa(pktID));
-         ip->setPriority(0);
-	 enc = new cMessage("VOIP",VOIP);
+	 enc = new cPacket("VOIP", VOIP);
 	 enc->encapsulate(ip);  //the function sendToUDP alters the message kind, thus I'm encapsulating the real message to preserve the kind!
          pktID++;
 
@@ -228,8 +224,9 @@ void VoIPGenerator::finish()
 
 // this function uses the random number generator #3 - you can alter the standard seed if you want to produce
 // more than one result
-VoIP_fileList *VoIPGenerator::generateTrace(double sec)
+VoIP_fileList *VoIPGenerator::generateTrace(simtime_t sec_)
 {
+    double sec = SIMTIME_DBL(sec_);
 	double  length, left, i, start, curpos;
 	int audiostream, no,  frame_size, min, max;
 	int new_frame_size, unreadSamples;
@@ -316,9 +313,7 @@ VoIP_fileList *VoIPGenerator::generateTrace(double sec)
 			//read one frame
 			if(av_read_frame(pFormatCtx, &packet)<0) 
 			{
-				perror("Error reading frame: ");
-				cerr << soundFileDir << endl;
-				exit(-1);
+				error("Error reading frame: %s", soundFileDir);
 			}
 			
 			// if the frame doesn't belong to our audiostream, continue... is not supposed to happen,
@@ -375,8 +370,8 @@ VoIP_fileList *VoIPGenerator::generateTrace(double sec)
 				} else {
 					packetList->setNewPacket(curpos, SILENCE, thisptr->voipSilenceSize, list[no]->name, start+length-i);
 				}
-				left -= thisptr->intArrTime;
-				i -= thisptr->intArrTime;
+				left -= SIMTIME_DBL(thisptr->intArrTime);
+				i -= SIMTIME_DBL(thisptr->intArrTime);
 				
 				psamples += samplesPerPacket;
 				unreadSamples -= samplesPerPacket;
@@ -422,13 +417,13 @@ struct wavinfo **VoIPGenerator::getWavInfo(struct dirent **namelist, int n)
 		
 		if(av_open_input_file(&pFormatCtx, infos[i]->name, NULL, 0, NULL) != 0)
 		{
-			cerr << "Unable to open file " <<  infos[i]->name << " !" << endl;
-			perror("");
+			ev << "Unable to open file "<< infos[i]->name << "!\n";
 			// file could not be opened
 			infos[i]->name[0] = 0;
 			infos[i]->length = -1;
 			infos[i]->sample_rate=0;
-			if(fm != 0) exit(-1); // in single-file mode, opening this file must not fail
+			if(fm != 0)
+			    error("Unable to open file %s!", infos[i]->name); // in single-file mode, opening this file must not fail
 			else continue;
 		}
 		
@@ -484,8 +479,7 @@ void VoIPGenerator::writeToDisk(VoIP_fileList *traceList, char *filename)
 	out = fopen(filename, "wt");
 	if(out == NULL)
 	{
-		ev << "writeTracesToDisk failed!" << endl;
-		return;
+		error("writeTracesToDisk failed!");
 	}
 	no = traceList->getNumber();
 	current = traceList->getCurrent();

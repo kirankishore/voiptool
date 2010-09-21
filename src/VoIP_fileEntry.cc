@@ -1,8 +1,9 @@
 
 #include "VoIP_fileEntry.h"
 
-VoIP_fileEntry::VoIP_fileEntry(double t, int type, int s, char *filename, double pos)
+VoIP_fileEntry::VoIP_fileEntry(simtime_t t, int type, int s, char *filename, double pos)
 {
+    //FIXME why double the pos???
 	time = t;
 	packetType = type;
 	size = s;
@@ -18,17 +19,17 @@ VoIP_fileEntry::~VoIP_fileEntry()
 {
 }
 
-double VoIP_fileEntry::getTime()
+simtime_t VoIP_fileEntry::getTime()
 {
 	return time;
 }
 
-double VoIP_fileEntry::getArrivalTime()
+simtime_t VoIP_fileEntry::getArrivalTime()
 {
 	return arrivalTime;
 }
 
-void VoIP_fileEntry::setArrivalTime(double t)
+void VoIP_fileEntry::setArrivalTime(simtime_t t)
 {
 	arrivalTime = t;
 }
@@ -38,7 +39,7 @@ bool VoIP_fileEntry::hasError()
 	return error;
 }
 
-void VoIP_fileEntry::setError(bool e)
+void VoIP_fileEntry::setBitErrorRate(bool e)
 {
 	error = e;
 }

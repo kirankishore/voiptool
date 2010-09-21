@@ -17,7 +17,7 @@
 #include "SysMsg_m.h"
 #include "VoIP_fileList.h"
 #include "VoIP_fileEntry.h"
-#include  "UDPAppBase.h"
+#include "UDPAppBase.h"
 #include <UDPControlInfo_m.h>
 #include "IPAddressResolver.h"
 
@@ -48,18 +48,18 @@ class INET_API VoIPGenerator : public UDPAppBase
     virtual void handleMessage(cMessage *msg);
     virtual void finish();
 
-// This function generates a packet list of voip-packets for a given length
-    VoIP_fileList *generateTrace(double sec);
-    static struct wavinfo **getWavInfo(struct dirent **namelist, int n);
-    static void writeToDisk(VoIP_fileList *traceList, char *filename);
+// This function generates a packet list of VoIP-packets for a given length
+    VoIP_fileList *generateTrace(simtime_t sec);
+    /*static*/ struct wavinfo **getWavInfo(struct dirent **namelist, int n);
+    /*static*/ void writeToDisk(VoIP_fileList *traceList, char *filename);
 
     char* itoa(int intVal); // returns a string representation of the given int value
 
             
   protected:
-    int writeTracesToDisk;      //bool value - parameter if VoIP tracefiles should be written to disk
+    bool writeTracesToDisk;      //bool value - parameter if VoIP tracefiles should be written to disk
     int pktID;             // increasing packet sequence number
-    int voipPktSize;       // size of voip packets
+    int voipPktSize;       // size of VoIP packets
     int voipHeaderSize;
     int samplesPerPacket;
     int codingRate;
@@ -75,8 +75,8 @@ class INET_API VoIPGenerator : public UDPAppBase
     struct wavinfo **list;     // list of available wavfiles
     VoIP_fileList *traceList;
 
-    double intArrTime;     // VOIP packet interarrival time
-    double simTimeLimit; //Simulation Time Limit
+    simtime_t intArrTime;     // VOIP packet interarrival time
+    simtime_t simTimeLimit; //Simulation Time Limit
 
     char* charVal;        // pointer to character array used for int-char[] conversions
 

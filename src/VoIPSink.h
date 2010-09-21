@@ -38,13 +38,13 @@ class VoIPSink : public UDPAppBase
 		
 	protected:
 		int samplesPerPacket;
-		int computePesqValue;
+		bool computePesqValue;
+        bool resample;                  // resample check
 		int codingRate;
 		
 		int pktno;						// packet number for voip packets
 		int audiostream;					// audiostream number inside audiofile
 		int localPort;
-		bool resample;					// resample check
 		char *cur_file;				// pointer to current audio filename
 		const char *originalWavFileName;
 		const char *degeneratedWavFileName;

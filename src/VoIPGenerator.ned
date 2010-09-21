@@ -1,22 +1,25 @@
+package voiptool;
+
+import inet.applications.udpapp.UDPApp;
+
 // define the traffic generator
-simple VoIPGenerator
+simple VoIPGenerator like UDPApp
+{
+    // the traffic parameters
+    parameters:
+        int voipHeaderSize @unit(B);
+        int samplesPerPacket;
+        int codingRate;
+        int voipSilenceThreshold;
+        bool writeTracesToDisk;
+        int localPort;
+        int destPort;
+        string destAddress;
+        string traceFileBasename;
+        string filemode;
+        string soundFileDir;
 
-  // the traffic parameters
-  parameters:
-      voipHeaderSize        : numeric const,
-      samplesPerPacket      : numeric const,
-      codingRate            : numeric const,
-      voipSilenceThreshold  : numeric const,
-      writeTracesToDisk     : numeric const,
-      localPort                 : numeric const,
-      destPort                   : numeric const,
-      destAddress            : string,
-      traceFileBasename     : string,
-      filemode              : string,
-      soundFileDir          : string;
-
-  gates:
-      in: from_udp;
-      out: to_udp;
-// 
-endsimple;
+    gates:
+        input udpIn;
+        output udpOut;
+}

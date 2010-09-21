@@ -1,6 +1,8 @@
 #ifndef VOIP_FILELIST_H
 #define VOIP_FILELIST_H
 
+#include <omnetpp.h>
+
 #include "VoIP_fileEntry.h"
 
 enum type {

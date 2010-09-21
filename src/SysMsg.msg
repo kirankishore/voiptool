@@ -11,32 +11,35 @@ cplusplus {{
 #include "SysMsg_AddOns.h"
 }}
 
+
 struct Container;
+
 
 enum SYSMSGTYPES
 {
-  // src releated messages
-  SRC_VOIP_TRG = 201; // triggers the source to send a voip packet
-  SRC_FTP_TRG  = 202; // triggers the source to send an ftp packet
 
- SINK_INIT_TRG = 301;  //Triggers initialization
+    // src releated messages
+    SRC_VOIP_TRG = 201; // triggers the source to send a voip packet
+    SRC_FTP_TRG = 202; // triggers the source to send an ftp packet
+
+    SINK_INIT_TRG = 301;  //Triggers initialization
 
 
 }
 
 enum MODTYPES
 {
-  BPSK          = 1000; // use BPSK as modulation technique
-  QPSK          = 1001; // use QPSK as modulation technique
-  EIGHTQAM      = 1002; // use 8-QAM as modulation technique
-  ONESIXQAM     = 1003; // use 16-QAM as modulation technique
-  SIXFOURQAM    = 1004; // use 64-QAM as modulation technique
-  TWOFIVESIXQAM = 1005; // use 256-QAM as modulation technique
+
+    BPSK = 1000; // use BPSK as modulation technique
+    QPSK = 1001; // use QPSK as modulation technique
+    EIGHTQAM = 1002; // use 8-QAM as modulation technique
+    ONESIXQAM = 1003; // use 16-QAM as modulation technique
+    SIXFOURQAM = 1004; // use 64-QAM as modulation technique
+    TWOFIVESIXQAM = 1005; // use 256-QAM as modulation technique
 }
 
 message SysMsg
 {
-  fields:
     int sender;
     int receiver;
     int id;
@@ -48,13 +51,5 @@ message SysMsg
     Container container;
     double xPos;
     double yPos;
-};
+}
 
-// ***************************************************************************
-// *                                                                         *
-// *   This program is free software; you can redistribute it and/or modify  *
-// *   it under the terms of the GNU General Public License as published by  *
-// *   the Free Software Foundation; either version 2 of the License, or     *
-// *   (at your option) any later version.                                   *
-// *                                                                         *
-// ***************************************************************************/

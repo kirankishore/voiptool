@@ -1,6 +1,8 @@
 #ifndef VOIP_FILEENTRY_H
 #define VOIP_FILEENTRY_H
 
+#include <omnetpp.h>
+
 using namespace std;
 
 // Just a container class - represents exactly one row.
@@ -8,29 +10,29 @@ using namespace std;
 class VoIP_fileEntry {
 
 	public:
-		VoIP_fileEntry(double t, int type, int size, char *filename, double pos); //Constructor
+		VoIP_fileEntry(simtime_t t, int type, int size, char *filename, double pos); //Constructor
 		~VoIP_fileEntry();
 
 // packetType: z.B. Silence-packet
 // wavefile: Just a pointer to the name, no extra memory is reserved for the name...
 
-		double getTime();
-		double getPosInWav();
+		simtime_t getTime();
+		double getPosInWav(); //FIXME why double???
 		int getPacketType();
 		int getSize();
 		int getPacketNo();
 		void setPacketNo(int no);
-		double getArrivalTime();
-		void setArrivalTime(double t);
+		simtime_t getArrivalTime();
+		void setArrivalTime(simtime_t t);
 		bool hasError();
-		void setError(bool e);
+		void setBitErrorRate(bool e);
 		char *getWaveFile();
 	
 	protected:
-		double time;
-		double arrivalTime;
+		simtime_t time;
+		simtime_t arrivalTime;
 		bool error;
-		double posInWav; //position inside wavfile
+		double posInWav; //position inside wavfile //FIXME why double???
 		int packetType;
 		int size;
 		int packetNo;

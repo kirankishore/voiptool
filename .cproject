@@ -21,7 +21,7 @@
 <folderInfo id="org.omnetpp.cdt.gnu.config.debug.439249852." name="/" resourcePath="">
 <toolChain id="org.omnetpp.cdt.gnu.toolchain.debug.180367861" name="GCC for OMNeT++" superClass="org.omnetpp.cdt.gnu.toolchain.debug">
 <targetPlatform binaryParser="org.eclipse.cdt.core.ELF;org.eclipse.cdt.core.MachO;org.eclipse.cdt.core.PE" id="org.omnetpp.cdt.targetPlatform.874712359" isAbstract="false" name="Windows, Linux, Mac" osList="win32,linux,macosx" superClass="org.omnetpp.cdt.targetPlatform"/>
-<builder id="org.omnetpp.cdt.gnu.builder.debug.313727728" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="OMNeT++ Make Builder (opp_makemake)" superClass="org.omnetpp.cdt.gnu.builder.debug"/>
+<builder buildPath="${workspace_loc:/voiptool/src}" id="org.omnetpp.cdt.gnu.builder.debug.313727728" keepEnvironmentInBuildfile="false" managedBuildOn="true" name="OMNeT++ Make Builder (opp_makemake)" superClass="org.omnetpp.cdt.gnu.builder.debug"/>
 <tool id="cdt.managedbuild.tool.gnu.archiver.base.1326063494" name="GCC Archiver" superClass="cdt.managedbuild.tool.gnu.archiver.base"/>
 <tool id="cdt.managedbuild.tool.gnu.cpp.compiler.base.2009443422" name="GCC C++ Compiler" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.base">
 <inputType id="cdt.managedbuild.tool.gnu.cpp.compiler.input.624736695" superClass="cdt.managedbuild.tool.gnu.cpp.compiler.input"/>
@@ -31,6 +31,9 @@
 </tool>
 <tool id="cdt.managedbuild.tool.gnu.c.linker.base.1791325249" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.base"/>
 <tool id="cdt.managedbuild.tool.gnu.cpp.linker.base.984186162" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.base">
+<option id="gnu.cpp.link.option.paths.1525837581" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/voiptool/libs}&quot;"/>
+</option>
 <inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.716787859" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 <additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 <additionalInput kind="additionalinput" paths="$(LIBS)"/>
@@ -43,7 +46,6 @@
 </folderInfo>
 <sourceEntries>
 <entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="src"/>
-<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="simulations"/>
 </sourceEntries>
 </configuration>
 </storageModule>
@@ -327,6 +329,8 @@
 </scannerConfigBuildInfo>
 </storageModule>
 <storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
+<storageModule moduleId="org.eclipse.cdt.core.language.mapping"/>
+<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
 </cconfiguration>
 <cconfiguration id="org.omnetpp.cdt.gnu.config.release.1862148276">
 <storageModule buildSystemId="org.eclipse.cdt.managedbuilder.core.configurationDataProvider" id="org.omnetpp.cdt.gnu.config.release.1862148276" moduleId="org.eclipse.cdt.core.settings" name="gcc-release">
@@ -356,6 +360,9 @@
 </tool>
 <tool id="cdt.managedbuild.tool.gnu.c.linker.base.2074362472" name="GCC C Linker" superClass="cdt.managedbuild.tool.gnu.c.linker.base"/>
 <tool id="cdt.managedbuild.tool.gnu.cpp.linker.base.1118668073" name="GCC C++ Linker" superClass="cdt.managedbuild.tool.gnu.cpp.linker.base">
+<option id="gnu.cpp.link.option.paths.1042379513" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
+<listOptionValue builtIn="false" value="&quot;${workspace_loc:/voiptool/libs}&quot;"/>
+</option>
 <inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.831945648" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 <additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 <additionalInput kind="additionalinput" paths="$(LIBS)"/>
@@ -368,7 +375,6 @@
 </folderInfo>
 <sourceEntries>
 <entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="src"/>
-<entry flags="VALUE_WORKSPACE_PATH" kind="sourcePath" name="simulations"/>
 </sourceEntries>
 </configuration>
 </storageModule>
@@ -652,6 +658,8 @@
 </scannerConfigBuildInfo>
 </storageModule>
 <storageModule moduleId="org.eclipse.cdt.core.externalSettings"/>
+<storageModule moduleId="org.eclipse.cdt.core.language.mapping"/>
+<storageModule moduleId="org.eclipse.cdt.internal.ui.text.commentOwnerProjectMappings"/>
 </cconfiguration>
 </storageModule>
 <storageModule moduleId="cdtBuildSystem" version="4.0.0">
