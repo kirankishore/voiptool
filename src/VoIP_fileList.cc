@@ -16,50 +16,46 @@ VoIP_fileList::~VoIP_fileList()
 {
 	for(int i=0; i<maxNo; i++)
 	{
-		if(list[i] != NULL) delete list[i];
+		if(list[i] != NULL)
+		    delete list[i];
 	}
 	delete[] list;
 }
 
-int VoIP_fileList::setNewPacket(double t, int type, int size, char *filename, double pos)
+int VoIP_fileList::setNewPacket(double t, VoIP_fileEntry::EntryType type, int size, char *filename, double pos)
 {
-	if(last >= this->maxNo) return -1;  //maximum number of packets reached
-	if(list[last] != NULL) delete list[last];
-	list[last] = new VoIP_fileEntry(t,type,size,filename, pos);
+	if(last >= this->maxNo)
+	    return -1;  //maximum number of packets reached
+
+	if(list[last] != NULL)
+	    delete list[last];
+
+	list[last] = new VoIP_fileEntry(t, type, size, filename, pos);
 	last++;
 	return 0;
 }
 
-//get number of allocated packets
-int VoIP_fileList::getNumber(void)
+VoIP_fileEntry *VoIP_fileList::getPacket(int pktno) const
 {
-	return last;
-}
+	if(pktno >= this->maxNo)
+	    return NULL;
 
-VoIP_fileEntry *VoIP_fileList::getPacket(int pktno)
-{
-	if(pktno >= this->maxNo) return NULL;
 	return list[pktno];
 }
 
-VoIP_fileEntry *VoIP_fileList::getCurrentPacket(void)
+VoIP_fileEntry *VoIP_fileList::getCurrentPacket(void) const
 {
 	return list[current];
 }
 
-void VoIP_fileList::next(void)
+void VoIP_fileList::next()
 {
-	if(current+1 == maxNo) current = 0;  //overflow protection
-	else current++;
+	if(++current == maxNo)
+	    current = 0;  //overflow protection
 }
 
 void VoIP_fileList::setCurrent(int number)
 {
-	if(number >= this->maxNo) return;
-	current = number;
-}
-
-int VoIP_fileList::getCurrent(void)
-{
-	return current;
+	if(number < this->maxNo)
+	    current = number;
 }

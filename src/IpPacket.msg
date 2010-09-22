@@ -9,7 +9,6 @@
 
 enum IPPACKETTYPES
 {
-
     VOIP = 100;
     FTP = 101;
 }
@@ -20,4 +19,3 @@ packet IpPacket
     int type;
     int id;
 }
-

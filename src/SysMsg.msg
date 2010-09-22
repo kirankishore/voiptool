@@ -17,19 +17,15 @@ struct Container;
 
 enum SYSMSGTYPES
 {
-
     // src releated messages
     SRC_VOIP_TRG = 201; // triggers the source to send a voip packet
     SRC_FTP_TRG = 202; // triggers the source to send an ftp packet
 
     SINK_INIT_TRG = 301;  //Triggers initialization
-
-
 }
 
 enum MODTYPES
 {
-
     BPSK = 1000; // use BPSK as modulation technique
     QPSK = 1001; // use QPSK as modulation technique
     EIGHTQAM = 1002; // use 8-QAM as modulation technique
@@ -52,4 +48,3 @@ message SysMsg
     double xPos;
     double yPos;
 }
-

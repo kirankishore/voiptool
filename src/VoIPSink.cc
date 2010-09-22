@@ -1,6 +1,8 @@
 
 #include "VoIPSink.h"
 
+#include "INETEndians.h"
+
 Define_Module(VoIPSink);
 
 void VoIPSink::initialize()
@@ -66,6 +68,7 @@ void VoIPSink::handleMessage(cMessage *msg)
 			initializeAudio();
 			delete msg;
 			break;
+
 		default:
 			handleMessage2(msg);
 			break;
@@ -107,7 +110,6 @@ void VoIPSink::handleMessage2(cMessage *msg)
 				psamples = 0;
 				startPos = -1;
 				initializeAudio();
-				
 			}
 			if(unreadSamples < samplesPerPacket) 
 			{
@@ -117,8 +119,7 @@ void VoIPSink::handleMessage2(cMessage *msg)
 					cerr << pkt->getWaveFile() << endl;
 					pkt = traceList->getPacket(pktno++);
 					cerr << pkt->getWaveFile() << endl;
-					cerr << "readNextFrame failed - canceling simulation!" << endl << endl;
-					exit(-1);
+					error("readNextFrame failed - canceling simulation!");
 				}
 			}
 			//write to original wav file the unaltered packet
@@ -130,18 +131,21 @@ void VoIPSink::handleMessage2(cMessage *msg)
 				pkt->setBitErrorRate(true);
 				// in case of an transmission error, silence is inserted into the output. There might be
 				// smarter algorithms to hide those errors, but this is not part of this simple demonstration
-				for(int i=psamples; i<(psamples+samplesPerPacket); i++) samples[i]=0;
+				for(int i=psamples; i<(psamples+samplesPerPacket); i++)
+				    samples[i]=0;
 			}
 			pkt->setPacketNo(pktno);
 			pkt->setArrivalTime(simTime());
-			if(ip->getType() == SILENCE)
+			if(ip->getType() == VoIP_fileEntry::SILENCE)
 			{
 				//silence packet, insert silence!
 				numberOfVoIpSilence++;
-				for(int i=psamples; i<(psamples+samplesPerPacket); i++) samples[i]=0;
+				for(int i=psamples; i<(psamples+samplesPerPacket); i++)
+				    samples[i]=0;
 			}
 			encodeNextPacket();
 			break;
+
 		default:
 			ev << "Sink: Unknown Packet received!" << endl;
 	}
@@ -152,6 +156,7 @@ void VoIPSink::encodeNextPacket()
 {
 	int g726_size, pcm_size;
 	int16_t *newSamples;
+
 	newSamples = new int16_t[2*samplesPerPacket]; // doppelt h�lt besser ;)
     pcm_size = sizeof(int16) * 2 * samplesPerPacket;
 	// at this point, the transmission errors and silence packets have been inserted into the samples buffer
@@ -173,54 +178,53 @@ int VoIPSink::readNextFrame()
 	int i;
 	int16_t *newSamples, *resamples;
 	newSamples = new int16_t[3000];
-	repeat:;
-	if(av_read_frame(pFormatCtx, &packet) < 0)              // if that is the case, eof is reached
-		return -1;
-	if(packet.duration == 0)   // this can actually happen - libavcodec reads the ID3v2 Header as an audio packet with duration 0...
+
+
+	for(;;)
 	{
-	    av_free_packet(&packet);
-	    goto repeat;
-	}
-	if(packet.stream_index != audiostream)
-	{
-		av_free_packet(&packet);
-		goto repeat;
-	}
-	// decode audio frame - frame_size is set to the number of bytes which have been written to newSamples
-	avcodec_decode_audio2(pCodecCtx, newSamples, &frame_size, packet.data, packet.size);
-	if(frame_size == 0)
-	{  // this should NOT happen... i'll check it for safety reasons
-		av_free_packet(&packet);
-		goto repeat;
+        if(av_read_frame(pFormatCtx, &packet) < 0)              // if that is the case, eof is reached
+            return -1;
+        if(packet.duration == 0)   // this can actually happen - libavcodec reads the ID3v2 Header as an audio packet with duration 0...
+        {
+            av_free_packet(&packet);
+            continue;
+        }
+        if(packet.stream_index != audiostream)
+        {
+            av_free_packet(&packet);
+            continue;
+        }
+        // decode audio frame - frame_size is set to the number of bytes which have been written to newSamples
+        frame_size = 6000;
+        avcodec_decode_audio2(pCodecCtx, newSamples, &frame_size, packet.data, packet.size);
+        // this should NOT happen... i'll check it for safety reasons
+        if(frame_size > 0)
+            break;
+
+        av_free_packet(&packet);
 	}
 	frame_size = frame_size / 2; // convert from bytes to samples
 	
 	if(startPos == 0)
-// the last frame was positioned at the start of the buffer; in case that there are leftover samples
-// which were to small for a voip packet, we must place the next frame behind the last leftover - samples
+    // the last frame was positioned at the start of the buffer; in case that there are leftover samples
+    // which were to small for a voip packet, we must place the next frame behind the last leftover - samples
 	{
-		// frame_size is in bytes
 		resamples = &(samples[psamples+unreadSamples]);
 		startPos = psamples;
 	} else {
 		// copy the leftover samples, if any, to the start of the buffer (since the startposition was not at 0)
-		i = 0;
-		while(i < unreadSamples)
-		{
+		for(i=0; i < unreadSamples; i++)
 			samples[i] = samples[psamples+i];
-			i++;
-		}
 		psamples = 0;
 		resamples = &(samples[unreadSamples]);
 		startPos = 0;
 	}
-	
-	
-	
+
 	if(pCodecCtx->channels == 2) // more than 2 channels will not be considered here
 	{
 		// convert to mono
-		for(i=0; i<frame_size/2; i++) newSamples[i] = (newSamples[2*i] + newSamples[2*i+1]) / 2;
+		for (i=0; i<frame_size/2; i++)
+		    newSamples[i] = (newSamples[2*i] + newSamples[2*i+1]) / 2;
 		frame_size = frame_size / 2;
 	}
 	if(resample)
@@ -230,7 +234,8 @@ int VoIPSink::readNextFrame()
 		unreadSamples += new_frame_size;
 	} else {
 		//resampling is disabled - input file is already in correct sample format
-		for(i=0; i<frame_size; i++) resamples[i] = newSamples[i];
+		for(i=0; i<frame_size; i++)
+		    resamples[i] = newSamples[i];
 		unreadSamples += frame_size;
 	}
 	delete[] newSamples;
@@ -259,46 +264,46 @@ void VoIPSink::writeFakeWavHeader(const char *filename)
 	format tag: see http://de.wikipedia.org/wiki/RIFF_WAVE for details,
 	0x0001 means PCM wave
 	*/
-	FILE *fp;
-	int numb;
-	char *temp;
-	char buf[5];
+    struct RiffWaveHeader
+    {
+        char riffTxt[4];        // "RIFF"
+        uint32_t filesize;      // remaining filesize (= filesize-8)
+        char waveTxt[4];        // "WAVE"
+        char fmtTxt[4];         // "fmt "
+        uint32_t headerlength;  // (length of the remaining header = 16 bytes)
+        uint16_t formatTag;
+        uint16_t channels;
+        uint32_t sampleRate;
+        uint32_t bytesPerSec;   // (sampleRate * sampleSize)
+        uint16_t sampleSize;    // (channels * bitsPerSample / 8)
+        uint16_t bitsPerSample; // 8, 16, 24
+        char dataTxt[4];        // "data"
+        uint32_t dataLength;
+    };
+
+    static const RiffWaveHeader riffWaveHeader =
+    {
+        {'R','I','F','F'},
+        htole32(0),
+        {'W','A','V','E'},
+        {'f','m','t',' '},
+        htole32(16) /*remaining header*/,
+        htole16(1) /*PCM wave*/,
+        htole16(1)/*channels*/,
+        htole32(8000),
+        htole32(16000),
+        htole16(2),
+        htole16(16),
+        {'d','a','t','a'},
+        htole32(0)
+    };
+
+    FILE *fp;
 	fp = fopen(filename, "wb");
-	if(fp == NULL) return;
-	strcpy(buf, "RIFF");           // ident string
-	fwrite(buf, 1, 4, fp);
-	numb = 0;                         // fake file size
-	temp = (char *)&numb;
-	fwrite(temp, 4, 1, fp);
-	strcpy(buf, "WAVE");
-	fwrite(buf, 1, 4, fp);
-	strcpy(buf, "fmt ");
-	fwrite(buf, 1, 4, fp);
-	numb = 16;
-	temp = (char *)&numb;
-	fwrite(temp, 4, 1, fp);
-	buf[0] = 0x01;                    // format tag, ( = PCM wave)
-	buf[1] = 0;
-	fwrite(buf, 1, 2, fp);
-	buf[0] = 0x01;                 // number of channels (must be one)
-	buf[1] = 0;
-	fwrite(buf, 1, 2, fp);
-	numb = 8000;               // sample rate
-	temp = (char *)&numb;
-	fwrite(temp, 4, 1, fp);
-	numb = 16000;  // samplerate * channels * (bits/sample  / 8 )
-	temp = (char *)&numb;
-	fwrite(temp, 4, 1, fp);
-	numb = 2;          // channels * (bits/sample  / 8 )
-	fwrite(temp, 2, 1, fp);
-	numb = 16;       // bits per sample
-	temp = (char *)&numb;
-	fwrite(temp, 2, 1, fp);
-	strcpy(buf, "data");
-	fwrite(buf, 1, 4, fp);
-	numb = 0;                          // filesize - 44 ; will be set later correctly
-	temp = (char *)&numb;
-	fwrite(temp, 4, 1, fp);
+	if(fp == NULL)
+	    return;
+
+	fwrite(&riffWaveHeader, 1, sizeof(riffWaveHeader), fp);
 	fclose(fp);
 }
 
@@ -309,6 +314,7 @@ void VoIPSink::initializeAudio()
 	{
 		error("Open of audio file failed!!\n");
 	}
+
 	// detect file format
 	if(av_find_stream_info(pFormatCtx)<0)
 	{
@@ -316,16 +322,17 @@ void VoIPSink::initializeAudio()
 	}
 	
 	//search for audio stream (important with file formats which support several streams, like .avi for example)
-	for(int i=0; i<pFormatCtx->nb_streams; i++)
-		if(pFormatCtx->streams[i]->codec->codec_type==CODEC_TYPE_AUDIO)
+	for(unsigned int i=0; i<pFormatCtx->nb_streams; i++)
 	{
-		audiostream=i;
-		break;
+		if(pFormatCtx->streams[i]->codec->codec_type==CODEC_TYPE_AUDIO)
+        {
+            audiostream = i;
+            break;
+        }
 	}
 	if(audiostream == -1)
 	{
-		cerr << "No audiostream found - invalid file!" << endl;
-		exit(-1);
+		error("No audiostream found - invalid file!");
 	}
 
 	pCodecCtx=pFormatCtx->streams[audiostream]->codec;
@@ -333,13 +340,11 @@ void VoIPSink::initializeAudio()
 	pCodec=avcodec_find_decoder(pCodecCtx->codec_id);
 	if(pCodec == NULL)
 	{
-		cerr << "No codec to decode input file found!" << endl;
-		exit(-1);
+		error("No codec to decode input file found!");
 	}
 	if(avcodec_open(pCodecCtx, pCodec)<0)
 	{
-		cerr << "opening the correct codec failed!" << endl;
-		exit(-1);
+		error("opening the correct codec failed!");
 	}
 	
 	//allocate g726 encoder and decoder
@@ -360,24 +365,20 @@ void VoIPSink::initializeAudio()
 	pCodec726Enc = avcodec_find_encoder(CODEC_ID_ADPCM_G726);
 	if(pCodec726Enc == NULL)
 	{
-		cerr << "G.726 Codec not found!" << endl;
-		exit(-1);
+		error("G.726 Codec not found!");
 	}
 	pCodec726Dec = avcodec_find_decoder(CODEC_ID_ADPCM_G726);
 	if(pCodec726Dec == NULL)
 	{
-		cerr << "G.726 Codec not found!" << endl;
-		exit(-1);
+		error("G.726 Codec not found!");
 	}
 	if(avcodec_open(p726EncCtx, pCodec726Enc) < 0)
 	{
-		cerr << "could not open G.726 encoding codec!" << endl;
-		exit(-1);
+		error("could not open G.726 encoding codec!");
 	}
 	if(avcodec_open(p726DecCtx, pCodec726Dec) < 0)
 	{
-		cerr << "could not open G.726 decoding codec!" << endl;
-		exit(-1);
+		error("could not open G.726 decoding codec!");
 	}
 	
 	if(pCodecCtx->sample_rate != 8000)
@@ -386,26 +387,30 @@ void VoIPSink::initializeAudio()
 		resample = true;
 		// if the file has more than one channel, we'll just take the average above all channels - this is not done with the ReSampleContext.
 		// initialize resample context
-		pReSampleCtx = audio_resample_init(1, 1, 8000, pCodecCtx->sample_rate);
-	} else resample = false;
+        pReSampleCtx = av_audio_resample_init(1, 1, 8000, pCodecCtx->sample_rate,
+                SAMPLE_FMT_S16, pCodecCtx->sample_fmt, 16, 10, 0, 0.8);
+                // parameters copied from the implementation of deprecated audio_resample_init()
+	}
+	else
+	    resample = false;
 }
 
 void VoIPSink::correctWavHeader(const char *filename)
 {
 	struct stat statbuf;
 	FILE *fp;
-	char *temp;
-	int filesize;
+	int32_t filesize;
 	stat(filename, &statbuf);
-	filesize = (int)statbuf.st_size - 8;
-	fp = fopen(filename,"r+b");
+
+	fp = fopen(filename, "r+b");
+
 	fseek(fp, 4L, SEEK_SET);
-	temp = (char *)&filesize;
-	fwrite(temp, 4, 1, fp);
+    filesize = htole32((int)statbuf.st_size - 8);
+	fwrite(&filesize, 4, 1, fp);
+
 	fseek(fp, 40L, SEEK_SET);
-	filesize = (int)statbuf.st_size - 44;
-	temp = (char *)&filesize;
-	fwrite(temp, 4, 1, fp);
+	filesize = htole32((int)statbuf.st_size - 44);
+	fwrite(&filesize, 4, 1, fp);
 	fclose(fp);
 }
 

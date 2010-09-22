@@ -5,32 +5,26 @@
 
 #include "VoIP_fileEntry.h"
 
-enum type {
-SILENCE = 9,
-VO_IP = 0 
-};
-
 using namespace std;
 
-class VoIP_fileList {
-	public:
-		VoIP_fileList(int no_pkt);  //Constructor: no_pkt - Number of packets
-		~VoIP_fileList();
-		int setNewPacket(double t, int type, int size, char *filename, double pos);
-		VoIP_fileEntry *getPacket(int pktno);
-		VoIP_fileEntry *getCurrentPacket(void);
-		void next(void);
-		void setCurrent(int number);
-		int getCurrent(void);
-		int getNumber(void);
-		
-	
-	protected:
-		int maxNo, current, last;
-		VoIP_fileEntry **list;
+class VoIP_fileList
+{
+  public:
+    VoIP_fileList(int no_pkt); //Constructor: no_pkt - Number of packets
+    ~VoIP_fileList();
+    int setNewPacket(double t, VoIP_fileEntry::EntryType type, int size, char *filename, double pos);
+    VoIP_fileEntry *getPacket(int pktno) const;
+    VoIP_fileEntry *getCurrentPacket(void) const;
+    void next();
+    void setCurrent(int number);
+    int getCurrent() const { return current; }
+    int getNumber() const { return last; }
+
+protected:
+    int maxNo;
+    int current;
+    int last;
+    VoIP_fileEntry **list;
 };
 
-
-
 #endif
-

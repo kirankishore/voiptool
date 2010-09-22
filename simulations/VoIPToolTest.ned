@@ -34,10 +34,6 @@ network VoIPToolTest
             parameters:
                 @display("p=71,64;i=device/laptop_l");
         }
-        //        host1: StandardHost;
-        //            display: "p=65,131;i=device/pc";
-        //        host2: StandardHost;
-        //            display: "p=60,191;i=device/pc";
         switch: EtherSwitch {
             parameters:
                 @display("p=202,156;i=device/switch");
@@ -56,22 +52,13 @@ network VoIPToolTest
         }
         configurator: FlatNetworkConfigurator {
             parameters:
-//                moduleTypes = "Router StandardHost EtherSwitch";
-//                nonIPModuleTypes = "EtherSwitch";
                 networkAddress = "10.0.0.0";
                 netmask = "255.255.0.0";
                 @display("p=495,160;i=block/cogwheel_s");
         }
     connections:
         client.ethg++ <--> switch.ethg++;
-
-//        switch.ethg++ <--> host1.ethg++;
-
-//        switch.ethg++ <--> host2.ethg++;
-
         router.ethg++ <--> switch.ethg++;
-
         router.ethg++ <--> fiberline <--> net.ethg++;
-
         server.ethg++ <--> fiberline <--> net.ethg++;
 }

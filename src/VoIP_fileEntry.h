@@ -7,33 +7,38 @@ using namespace std;
 
 // Just a container class - represents exactly one row.
 
-class VoIP_fileEntry {
-
+class VoIP_fileEntry
+{
 	public:
-		VoIP_fileEntry(simtime_t t, int type, int size, char *filename, double pos); //Constructor
+        enum EntryType {
+            SILENCE = 9,
+            VO_IP = 0
+        };
+
+		VoIP_fileEntry(simtime_t t, EntryType type, int size, char *filename, double pos); //Constructor
 		~VoIP_fileEntry();
 
 // packetType: z.B. Silence-packet
 // wavefile: Just a pointer to the name, no extra memory is reserved for the name...
 
-		simtime_t getTime();
-		double getPosInWav(); //FIXME why double???
-		int getPacketType();
-		int getSize();
-		int getPacketNo();
+		simtime_t getTime() const { return time; }
+		double getPosInWav() const { return posInWav; } //FIXME why double???
+		VoIP_fileEntry::EntryType getPacketType() const { return packetType; }
+		int getSize() const { return size; }
+		int getPacketNo() const { return packetNo; }
 		void setPacketNo(int no);
-		simtime_t getArrivalTime();
+		simtime_t getArrivalTime() const { return arrivalTime; }
 		void setArrivalTime(simtime_t t);
-		bool hasError();
+		bool hasError() const { return error; }
 		void setBitErrorRate(bool e);
-		char *getWaveFile();
+		char *getWaveFile() const { return wavefile; }
 	
 	protected:
 		simtime_t time;
 		simtime_t arrivalTime;
 		bool error;
 		double posInWav; //position inside wavfile //FIXME why double???
-		int packetType;
+		EntryType packetType;
 		int size;
 		int packetNo;
 		char *wavefile;
