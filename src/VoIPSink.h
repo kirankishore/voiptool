@@ -2,8 +2,12 @@
 #define VOIPSINK_H
 
 #include <omnetpp.h>
-#include <avcodec.h>
-#include <avformat.h>
+
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+};
+
 #include <iostream>
 #include <sys/stat.h>
 #include "IpPacket_m.h"

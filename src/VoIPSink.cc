@@ -153,13 +153,14 @@ void VoIPSink::encodeNextPacket()
 	int g726_size, pcm_size;
 	int16_t *newSamples;
 	newSamples = new int16_t[2*samplesPerPacket]; // doppelt h�lt besser ;)
+    pcm_size = sizeof(int16) * 2 * samplesPerPacket;
 	// at this point, the transmission errors and silence packets have been inserted into the samples buffer
 	// encode it to G.726 !
 	g726_size = avcodec_encode_audio(p726EncCtx, g726buf, samplesPerPacket, &samples[psamples]);
 	psamples += samplesPerPacket;
 	unreadSamples -= samplesPerPacket;
 	//and decode it back to PCM wave
-	avcodec_decode_audio(p726DecCtx, newSamples, &pcm_size, g726buf, g726_size);
+	avcodec_decode_audio2(p726DecCtx, newSamples, &pcm_size, g726buf, g726_size);
 	// pcm_size: output size in bytes!
 	pcm_size = pcm_size / 2;
 	// write degenerated audio data
@@ -186,7 +187,7 @@ int VoIPSink::readNextFrame()
 		goto repeat;
 	}
 	// decode audio frame - frame_size is set to the number of bytes which have been written to newSamples
-	avcodec_decode_audio(pCodecCtx, newSamples, &frame_size, packet.data, packet.size);
+	avcodec_decode_audio2(pCodecCtx, newSamples, &frame_size, packet.data, packet.size);
 	if(frame_size == 0)
 	{  // this should NOT happen... i'll check it for safety reasons
 		av_free_packet(&packet);

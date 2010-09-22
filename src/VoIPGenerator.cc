@@ -10,7 +10,11 @@
 // TODO: Zeile 310 - berechnung der Position korrekt ?
 
 #include "VoIPGenerator.h"
-#include <avformat.h>
+
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+};
 
 //static member variables must be declared AND implemented... and ISO standard forbids implementation in the class { } section
 VoIPGenerator *VoIPGenerator::thisptr = (VoIPGenerator *)NULL;
@@ -248,8 +252,8 @@ VoIP_fileList *VoIPGenerator::generateTrace(simtime_t sec_)
 	startPos = false;
 	
 	// Buffer for audio samples
-	samples = new int16_t[6000];
-	newSamples = new int16_t[3000];
+	samples = new int16_t[AVCODEC_MAX_AUDIO_FRAME_SIZE];
+	newSamples = new int16_t[AVCODEC_MAX_AUDIO_FRAME_SIZE];
 	
 	VoIP_fileList *packetList;
 	
@@ -282,7 +286,7 @@ VoIP_fileList *VoIPGenerator::generateTrace(simtime_t sec_)
 		audiostream = -1;
 	
 		//get stream number
-		for(int j=0; j<pFormatCtx->nb_streams; j++)
+		for(unsigned int j=0; j<pFormatCtx->nb_streams; j++)
 			if(pFormatCtx->streams[j]->codec->codec_type==CODEC_TYPE_AUDIO)
 		{
 			audiostream=j;
@@ -296,7 +300,10 @@ VoIP_fileList *VoIPGenerator::generateTrace(simtime_t sec_)
 		if(pCodecCtx->sample_rate != 8000)
 		{
 			resample = true;
-			pReSampleCtx = audio_resample_init(1, 1, 8000, pCodecCtx->sample_rate);
+//			pReSampleCtx = audio_resample_init(1, 1, 8000, pCodecCtx->sample_rate);
+            pReSampleCtx = av_audio_resample_init(1, 1, 8000, pCodecCtx->sample_rate,
+                    SAMPLE_FMT_S16, pCodecCtx->sample_fmt, 16, 10, 0, 0.8);
+                    // parameters copied from the implementation of deprecated audio_resample_init()
 		} else  {
 			resample = false;
 			pReSampleCtx = NULL;
@@ -311,9 +318,10 @@ VoIP_fileList *VoIPGenerator::generateTrace(simtime_t sec_)
 		while(i > 0)
 		{
 			//read one frame
-			if(av_read_frame(pFormatCtx, &packet)<0) 
+            int err = av_read_frame(pFormatCtx, &packet);
+			if(err < 0)
 			{
-				error("Error reading frame: %s", soundFileDir);
+				error("Error reading frame: %s, err=%d", soundFileDir, err);
 			}
 			
 			// if the frame doesn't belong to our audiostream, continue... is not supposed to happen,
@@ -324,7 +332,9 @@ VoIP_fileList *VoIPGenerator::generateTrace(simtime_t sec_)
 			if(packet.duration == 0) continue;
 			
 			// decode audio and save the decoded samples in our buffer
-			avcodec_decode_audio(pCodecCtx, newSamples, &frame_size, packet.data, packet.size);
+			frame_size = AVCODEC_MAX_AUDIO_FRAME_SIZE;
+			avcodec_decode_audio2(pCodecCtx, newSamples, &frame_size, packet.data, packet.size);
+
 			if(frame_size == 0) continue;
 
 			if(pCodecCtx->channels == 2)
@@ -435,7 +445,7 @@ struct wavinfo **VoIPGenerator::getWavInfo(struct dirent **namelist, int n)
 		// get correct audiostream and codec
 		// with this code, one could read more audio formats like mp3 etc; even reading the audio track of a video file
 		// is possible.
-		for(int j=0; j<pFormatCtx->nb_streams; j++)
+		for(unsigned int j=0; j<pFormatCtx->nb_streams; j++)
 			if(pFormatCtx->streams[j]->codec->codec_type==CODEC_TYPE_AUDIO)
 		{
 			audiostream=j;
@@ -493,7 +503,7 @@ void VoIPGenerator::writeToDisk(VoIP_fileList *traceList, char *filename)
 		//write only the traces to disk that actually have been send (or queued to send)
 		//if(pkt->getPacketNo() == -1) break;
 		
-		fprintf(out, "%lf\t%lf\t", pkt->getTime(), pkt->getArrivalTime());
+		fprintf(out, "%s\t%s\t", SIMTIME_STR(pkt->getTime()), SIMTIME_STR(pkt->getArrivalTime()));
 		if(pkt->getPacketType() == SILENCE) fprintf(out, "Silence\t");
 		else fprintf(out, "VoIP\t");
 		fprintf(out, "%d\t%lf\t",pkt->getSize(), pkt->getPosInWav());
