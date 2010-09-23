@@ -24,6 +24,7 @@ class VoIPSink : public UDPAppBase
 {
 	//Module_Class_Members(VoIPSink, cSimpleModule, 0);
 	public:
+        VoIPSink() : samples(NULL), g726buf(NULL) {}
 	
 	protected:
 		virtual void initialize();

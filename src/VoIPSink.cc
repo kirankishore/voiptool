@@ -33,7 +33,7 @@ void VoIPSink::initialize()
 	
 	//allocate audio buffers
 	//in a wav file, one frame read in contains 2048 samples, in a mp3 file, one frame contains 1152 samples per channel.
-	samples = new int16_t[6000];
+	samples = new int16_t[8000];
 	g726buf = new uint8_t[2*samplesPerPacket];
 	cur_file = new char[1000];
 	unreadSamples = 0;
@@ -157,8 +157,8 @@ void VoIPSink::encodeNextPacket()
 	int g726_size, pcm_size;
 	int16_t *newSamples;
 
-	newSamples = new int16_t[2*samplesPerPacket]; // doppelt h�lt besser ;)
-    pcm_size = sizeof(int16) * 2 * samplesPerPacket;
+	newSamples = new int16_t[2 * samplesPerPacket]; // doppelt h�lt besser ;)
+    pcm_size = sizeof(int16_t) * samplesPerPacket;
 	// at this point, the transmission errors and silence packets have been inserted into the samples buffer
 	// encode it to G.726 !
 	g726_size = avcodec_encode_audio(p726EncCtx, g726buf, samplesPerPacket, &samples[psamples]);
@@ -169,6 +169,7 @@ void VoIPSink::encodeNextPacket()
 	// pcm_size: output size in bytes!
 	pcm_size = pcm_size / 2;
 	// write degenerated audio data
+	ASSERT(pcm_size <= 2*samplesPerPacket);
 	fwrite(newSamples, 2, pcm_size, degenerated);
 }
 
@@ -177,10 +178,10 @@ int VoIPSink::readNextFrame()
 	int frame_size, new_frame_size;
 	int i;
 	int16_t *newSamples, *resamples;
-	newSamples = new int16_t[3000];
+	newSamples = new int16_t[4000];
 
 
-	for(;;)
+	for(;true;)
 	{
         if(av_read_frame(pFormatCtx, &packet) < 0)              // if that is the case, eof is reached
             return -1;
@@ -195,7 +196,7 @@ int VoIPSink::readNextFrame()
             continue;
         }
         // decode audio frame - frame_size is set to the number of bytes which have been written to newSamples
-        frame_size = 6000;
+        frame_size = sizeof(int16_t)*4000;
         avcodec_decode_audio2(pCodecCtx, newSamples, &frame_size, packet.data, packet.size);
         // this should NOT happen... i'll check it for safety reasons
         if(frame_size > 0)
@@ -437,8 +438,8 @@ void VoIPSink::finish()
 	fputs(command, result);
 	sprintf(command, "number of silence packets:\t%d\n", numberOfVoIpSilence);
 	fputs(command, result);
-	delete[] samples;
-	delete[] g726buf;
+	delete[] samples; samples = NULL;
+	delete[] g726buf; g726buf = NULL;
 	if(computePesqValue)
 	{
 		if(stat("pesq", &statbuf) != 0) // Check if file exists
