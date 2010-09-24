@@ -1,0 +1,3 @@
+package VoIPToolTest;
+
+@license(LGPL);

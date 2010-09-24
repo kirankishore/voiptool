@@ -11,7 +11,7 @@
 // See the GNU Lesser General Public License for more details.
 //
 
-package voiptool.simulations;
+package VoIPToolTest;
 
 import inet.nodes.inet.StandardHost;
 import inet.nodes.inet.Router;
@@ -23,7 +23,6 @@ channel fiberline extends ned.DatarateChannel
 {
     parameters:
         delay = 1us;
-//        datarate = 512Mbps;
 }
 
 

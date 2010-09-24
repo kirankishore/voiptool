@@ -7,7 +7,7 @@
 //    email                : renwanz@tkn.tu-berlin.de
 // ***************************************************************************/
 
-package voiptool.simulations;
+package VoIPToolTest;
 
 import voiptool.VoIPSink;
 import voiptool.VoIPGenerator;
