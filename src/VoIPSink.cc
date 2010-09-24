@@ -33,7 +33,7 @@ void VoIPSink::initialize()
 	
 	//allocate audio buffers
 	//in a wav file, one frame read in contains 2048 samples, in a mp3 file, one frame contains 1152 samples per channel.
-	samples = new int16_t[8000];
+	samples = new int16_t[G726_SAMPLERATE];
 	g726buf = new uint8_t[2*samplesPerPacket];
 	cur_file = new char[1000];
 	unreadSamples = 0;
@@ -77,14 +77,14 @@ void VoIPSink::handleMessage(cMessage *msg)
 
 void VoIPSink::handleMessage2(cMessage *msg)
 {
-	IpPacket *ip=NULL;
+	VoIPPacket *ip=NULL;
 	
 	VoIP_fileList *traceList=NULL;
 	VoIP_fileEntry *pkt=NULL;
 	
 	traceList = VoIPGenerator::getList();
 	
-	ip = (IpPacket *)(PK(msg)->decapsulate());
+	ip = (VoIPPacket *)(PK(msg)->decapsulate());
 	delete msg;
 	if(ip == NULL)
 	{
@@ -93,7 +93,7 @@ void VoIPSink::handleMessage2(cMessage *msg)
 	}
 	switch(ip->getKind())
 	{
-		case VOIP:
+		case VOICE:
 			ev << "Sink: VoIP Packet received!" << endl;
 			pkt = traceList->getPacket(pktno++);
 			if(strcmp(cur_file, pkt->getWaveFile()) != 0)
@@ -136,7 +136,7 @@ void VoIPSink::handleMessage2(cMessage *msg)
 			}
 			pkt->setPacketNo(pktno);
 			pkt->setArrivalTime(simTime());
-			if(ip->getType() == VoIP_fileEntry::SILENCE)
+			if(ip->getType() == SILENT)
 			{
 				//silence packet, insert silence!
 				numberOfVoIpSilence++;
@@ -180,8 +180,7 @@ int VoIPSink::readNextFrame()
 	int16_t *newSamples, *resamples;
 	newSamples = new int16_t[4000];
 
-
-	for(;true;)
+	for(; true; )
 	{
         if(av_read_frame(pFormatCtx, &packet) < 0)              // if that is the case, eof is reached
             return -1;
@@ -288,13 +287,13 @@ void VoIPSink::writeFakeWavHeader(const char *filename)
         htole32(0),
         {'W','A','V','E'},
         {'f','m','t',' '},
-        htole32(16) /*remaining header*/,
-        htole16(1) /*PCM wave*/,
-        htole16(1)/*channels*/,
-        htole32(8000),
-        htole32(16000),
-        htole16(2),
-        htole16(16),
+        htole32(16),                    // length of remaining header
+        htole16(1),                     // ID (PCM wave)
+        htole16(1),                     // num. of channels
+        htole32(G726_SAMPLERATE),       // sampleRate
+        htole32(sizeof(int16) * G726_SAMPLERATE),   // bytesPerSec
+        htole16(sizeof(int16)),         // sampleSize
+        htole16(sizeof(int16) * 8),     // bitsPerSample
         {'d','a','t','a'},
         htole32(0)
     };
@@ -343,7 +342,7 @@ void VoIPSink::initializeAudio()
 	{
 		error("No codec to decode input file found!");
 	}
-	if(avcodec_open(pCodecCtx, pCodec)<0)
+	if(avcodec_open(pCodecCtx, pCodec) < 0)
 	{
 		error("opening the correct codec failed!");
 	}
@@ -355,21 +354,17 @@ void VoIPSink::initializeAudio()
 
 	// G.726 supports only one channel with a sampling frequency of 8000 Hz !
 	// Thus, any input files, which differ from that must be resampled!
-	p726EncCtx->sample_rate = 8000;
+	p726EncCtx->sample_rate = G726_SAMPLERATE;
 	p726EncCtx->channels = 1;
 	p726DecCtx = avcodec_alloc_context();
 	p726DecCtx->bit_rate = codingRate;
-	p726DecCtx->sample_rate = 8000;
+	p726DecCtx->sample_rate = G726_SAMPLERATE;
 	p726DecCtx->channels = 1;
 	
 	//search vor encoder and decoder codec in library
 	pCodec726Enc = avcodec_find_encoder(CODEC_ID_ADPCM_G726);
-	if(pCodec726Enc == NULL)
-	{
-		error("G.726 Codec not found!");
-	}
 	pCodec726Dec = avcodec_find_decoder(CODEC_ID_ADPCM_G726);
-	if(pCodec726Dec == NULL)
+	if((pCodec726Enc == NULL) || (pCodec726Dec == NULL))
 	{
 		error("G.726 Codec not found!");
 	}
@@ -382,13 +377,13 @@ void VoIPSink::initializeAudio()
 		error("could not open G.726 decoding codec!");
 	}
 	
-	if(pCodecCtx->sample_rate != 8000)
+	if(pCodecCtx->sample_rate != G726_SAMPLERATE)
 	{
 		//sampling rate is not 8000 Hz, we must resample!
 		resample = true;
 		// if the file has more than one channel, we'll just take the average above all channels - this is not done with the ReSampleContext.
 		// initialize resample context
-        pReSampleCtx = av_audio_resample_init(1, 1, 8000, pCodecCtx->sample_rate,
+        pReSampleCtx = av_audio_resample_init(1, 1, G726_SAMPLERATE, pCodecCtx->sample_rate,
                 SAMPLE_FMT_S16, pCodecCtx->sample_fmt, 16, 10, 0, 0.8);
                 // parameters copied from the implementation of deprecated audio_resample_init()
 	}
@@ -446,11 +441,7 @@ void VoIPSink::finish()
 		{
 			error("computePesqValue is enabled, but an error occured ");
 		}
-		strcpy(command, "./pesq +8000 ");
-		strcat(command, originalWavFileName);
-		strcat(command, " ");
-		strcat(command, degeneratedWavFileName);
-		strcat(command, " > /dev/null");
+		sprintf(command, "./pesq +%d %s %s >/dev/null", G726_SAMPLERATE, originalWavFileName, degeneratedWavFileName);
 		//make sure, the file doesn't exist
 		remove("_pesq_results.txt");
 		system(command);

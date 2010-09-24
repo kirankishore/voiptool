@@ -50,7 +50,7 @@ void VoIPGenerator::initialize(int stage)
     voipHeaderSize = par("voipHeaderSize");
     samplesPerPacket = par("samplesPerPacket");
     codingRate = par("codingRate");
-    intArrTime = (double)samplesPerPacket / 8000.0;
+    intArrTime = (double)samplesPerPacket / double(G726_SAMPLERATE);
     ev << "interArrivalTime: a packet is send every " << intArrTime*1000.0 << "ms!" << endl;
     voipPktSize = voipHeaderSize + (int)SIMTIME_DBL(intArrTime * (double)codingRate);
     ev << "voip Pkt size in Bits: " << voipPktSize <<endl;
@@ -133,7 +133,7 @@ void VoIPGenerator::initialize(int stage)
 void VoIPGenerator::handleMessage(cMessage *msg)
 {
     // create an IP message
-    IpPacket *ip;
+    VoIPPacket *ip;
     cPacket *enc;
     VoIP_fileEntry *pkt;
     IPvXAddress dest;
@@ -145,7 +145,7 @@ void VoIPGenerator::handleMessage(cMessage *msg)
     case SRC_VOIP_TRG:
 
         // create VoIPpacket
-        ip = new IpPacket("VOIP",VOIP);
+        ip = new VoIPPacket("VOIP", VOICE);
 
         //get current voIP packet
         pkt = traceList->getCurrentPacket();
@@ -159,7 +159,7 @@ void VoIPGenerator::handleMessage(cMessage *msg)
          //Type: VoIP / Silence
         ip->setType(pkt->getPacketType());
         ip->setName(itoa(pktID));
-        enc = new cPacket("VOIP", VOIP);
+        enc = new cPacket("VOIP", VOICE);
         enc->encapsulate(ip);  //the function sendToUDP alters the message kind, thus I'm encapsulating the real message to preserve the kind!
         pktID++;
 
@@ -167,7 +167,7 @@ void VoIPGenerator::handleMessage(cMessage *msg)
          //send(ip, gate("to_udp"));
 
         dest = IPAddressResolver().resolve(destAddress);
-        bindToPort(localPort);
+//        bindToPort(localPort);
 
         sendToUDP(enc, localPort, dest, destPort);
 
@@ -264,17 +264,8 @@ VoIP_fileList *VoIPGenerator::generateTrace(simtime_t sec_)
 	{
 		// determine which wav file to use
 		no = intuniform(0,thisptr->noWavFiles-1, 3);
-		if(list[no]->length > left) 
-		{
-			// the length, how much of the wavfile is to be used;
-			length = left;
-			// startposition inside the wavfile
-			//start = uniform(0.0,list[no]->length - length, 3);
-			start = 0.0;
-		} else {
-			length = list[no]->length;
-			start = 0.0;
-		}
+        length = std::min(list[no]->length, left);
+        start = 0.0;
 	
 		// If the length is smaller than one VoIP Packet - doesn't matter because in this case he will send one packet... covering the length ;)
 		// open input file
@@ -296,11 +287,10 @@ VoIP_fileList *VoIPGenerator::generateTrace(simtime_t sec_)
 		//find decoder and open the correct codec
 		pCodec=avcodec_find_decoder(pCodecCtx->codec_id);
 		avcodec_open(pCodecCtx, pCodec);
-		if(pCodecCtx->sample_rate != 8000)
+		if(pCodecCtx->sample_rate != G726_SAMPLERATE)
 		{
 			resample = true;
-//			pReSampleCtx = audio_resample_init(1, 1, 8000, pCodecCtx->sample_rate);
-            pReSampleCtx = av_audio_resample_init(1, 1, 8000, pCodecCtx->sample_rate,
+            pReSampleCtx = av_audio_resample_init(1, 1, G726_SAMPLERATE, pCodecCtx->sample_rate,
                     SAMPLE_FMT_S16, pCodecCtx->sample_fmt, 16, 10, 0, 0.8);
                     // parameters copied from the implementation of deprecated audio_resample_init()
 		} else  {
@@ -379,9 +369,9 @@ VoIP_fileList *VoIPGenerator::generateTrace(simtime_t sec_)
 				curpos = sec - left;
 				if((abs(min) > voipSilenceThreshold) || (abs(max) > voipSilenceThreshold))
 				{
-					packetList->setNewPacket(curpos, VoIP_fileEntry::VO_IP, thisptr->voipPktSize, list[no]->name, start+length-i);
+					packetList->setNewPacket(curpos, VOICE, thisptr->voipPktSize, list[no]->name, start+length-i);
 				} else {
-					packetList->setNewPacket(curpos, VoIP_fileEntry::SILENCE, thisptr->voipSilenceSize, list[no]->name, start+length-i);
+					packetList->setNewPacket(curpos, SILENT, thisptr->voipSilenceSize, list[no]->name, start+length-i);
 				}
 				left -= SIMTIME_DBL(thisptr->intArrTime);
 				i -= SIMTIME_DBL(thisptr->intArrTime);
@@ -468,7 +458,7 @@ struct wavinfo **VoIPGenerator::getWavInfo(struct dirent **namelist, int n)
 		//we assumed that the voip stream is encoded with the audio codec G.726 .
 		// this codec only supports the sampling rate 8000 Hz. Thus, either all files have to
 		// match this rate or, one would have to use a resampling function...
-		if(pCodecCtx->sample_rate != 8000)
+		if(pCodecCtx->sample_rate != G726_SAMPLERATE)
 		{
 			// Here would be the place for a resampling function - or an error message...
 		}
@@ -514,7 +504,7 @@ void VoIPGenerator::writeToDisk(VoIP_fileList *traceList, char *filename)
 		//if(pkt->getPacketNo() == -1) break;
 		
 		fprintf(out, "%s\t%s\t", SIMTIME_STR(pkt->getTime()), SIMTIME_STR(pkt->getArrivalTime()));
-        fprintf(out, "%s\t", (pkt->getPacketType() == VoIP_fileEntry::SILENCE) ? "Silence" : "VoIP");
+        fprintf(out, "%s\t", (pkt->getPacketType() == SILENT) ? "Silence" : "Voice");
 		fprintf(out, "%d\t%lf\t",pkt->getSize(), pkt->getPosInWav());
 		fprintf(out, "%6d\t\t", pkt->getPacketNo());
         fprintf(out, "%s\t", (pkt->hasError()) ? "1" : "0");

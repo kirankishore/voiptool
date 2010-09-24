@@ -22,7 +22,7 @@ VoIP_fileList::~VoIP_fileList()
 	delete[] list;
 }
 
-int VoIP_fileList::setNewPacket(double t, VoIP_fileEntry::EntryType type, int size, char *filename, double pos)
+int VoIP_fileList::setNewPacket(double t, VoIPPacketType type, int size, char *filename, double pos)
 {
 	if(last >= this->maxNo)
 	    return -1;  //maximum number of packets reached

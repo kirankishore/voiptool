@@ -12,11 +12,11 @@ extern "C" {
 #include <sys/stat.h>
 
 #include "IPAddressResolver.h"
-#include "IpPacket_m.h"
 #include "SysMsg_m.h"
 #include "UDPAppBase.h"
 #include "UDPControlInfo_m.h"
 #include "VoIPGenerator.h"
+#include "VoIPPacket_m.h"
 
 using namespace std;
 

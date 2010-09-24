@@ -3,6 +3,8 @@
 
 #include <omnetpp.h>
 
+#include "VoIPPacket_m.h"
+
 using namespace std;
 
 // Just a container class - represents exactly one row.
@@ -10,12 +12,7 @@ using namespace std;
 class VoIP_fileEntry
 {
 	public:
-        enum EntryType {
-            SILENCE = 9,
-            VO_IP = 0
-        };
-
-		VoIP_fileEntry(simtime_t t, EntryType type, int size, char *filename, double pos); //Constructor
+		VoIP_fileEntry(simtime_t t, VoIPPacketType type, int size, char *filename, double pos); //Constructor
 		~VoIP_fileEntry();
 
 // packetType: z.B. Silence-packet
@@ -23,7 +20,7 @@ class VoIP_fileEntry
 
 		simtime_t getTime() const { return time; }
 		double getPosInWav() const { return posInWav; } //FIXME why double???
-		VoIP_fileEntry::EntryType getPacketType() const { return packetType; }
+		VoIPPacketType getPacketType() const { return packetType; }
 		int getSize() const { return size; }
 		int getPacketNo() const { return packetNo; }
 		void setPacketNo(int no);
@@ -38,7 +35,7 @@ class VoIP_fileEntry
 		simtime_t arrivalTime;
 		bool error;
 		double posInWav; //position inside wavfile //FIXME why double???
-		EntryType packetType;
+		VoIPPacketType packetType;
 		int size;
 		int packetNo;
 		char *wavefile;

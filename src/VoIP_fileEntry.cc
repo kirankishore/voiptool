@@ -1,7 +1,7 @@
 
 #include "VoIP_fileEntry.h"
 
-VoIP_fileEntry::VoIP_fileEntry(simtime_t t, VoIP_fileEntry::EntryType type, int s, char *filename, double pos)
+VoIP_fileEntry::VoIP_fileEntry(simtime_t t, VoIPPacketType type, int s, char *filename, double pos)
 {
     //FIXME why double the pos???
 	time = t;
