@@ -1,4 +1,13 @@
 /***************************************************************************
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ ***************************************************************************/
+
+/***************************************************************************
                  TrafficGenerator.h  -  simple traffic generator
                              -------------------
     begin                : Wed Jul 13 2005
@@ -6,13 +15,17 @@
     email                : bohge@tkn.tu-berlin.de
  ***************************************************************************/
 
-#ifndef SOURCE_H
-#define SOURCE_H
+#ifndef VOIPTOOL_VOIPGENERATOR_H
+#define VOIPTOOL_VOIPGENERATOR_H
 
-#include <dirent.h>
 #include <fnmatch.h>
 #include <vector>
 #include <omnetpp.h>
+
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+};
 
 #include "IPAddressResolver.h"
 #include "SysMsg_m.h"
@@ -22,26 +35,11 @@
 #include "VoIP_fileEntry.h"
 #include "VoIPPacket_m.h"
 
-using namespace std;
-
-struct wavinfo {
-	char name[256];			//filename
-	double length;				//length in seconds
-	int sample_rate;			//samplerate in Hz
-};
+//using namespace std;
 
 class INET_API VoIPGenerator : public UDPAppBase
 {
-/*  Module_Class_Members(VoIPGenerator, cSimpleModule, 0);*/
-
-
   public:
-	//generate Tracefile for ONE terminal
-	//sec - length in seconds of tracefile
-	//Function is static to be accessable from other classes
-	
-	static VoIPGenerator *thisptr;
-	static VoIP_fileList *getList();
 
   protected:
     virtual void initialize(int stage);
@@ -49,48 +47,48 @@ class INET_API VoIPGenerator : public UDPAppBase
     virtual void handleMessage(cMessage *msg);
     virtual void finish();
 
-// This function generates a packet list of VoIP-packets for a given length
-    VoIP_fileList *generateTrace(simtime_t sec);
-    /*static*/ struct wavinfo **getWavInfo(struct dirent **namelist, int n);
-    /*static*/ void writeToDisk(VoIP_fileList *traceList, char *filename);
+    void openSoundFile(const char *name);
+    VoIPPacket* generatePacket();
+    bool checkSilence(void* _buf, int samples);
+    void readFrame();
 
-    char* itoa(int intVal); // returns a string representation of the given int value
-
-            
   protected:
-    bool writeTracesToDisk;      //bool value - parameter if VoIP tracefiles should be written to disk
-    int pktID;             // increasing packet sequence number
-    int voipPktSize;       // size of VoIP packets
-    int voipHeaderSize;
-    int samplesPerPacket;
-    int codingRate;
-    int voipSilenceSize;  // size of a silence packet
-    int voipSilenceThreshold;  // the maximum amplitude of a silence packet
-    int noWavFiles;    // number of VoIP wav files available
     int localPort;
     int destPort;
-    const char *soundFileDir;       //Directory containing wav files
-    const char *traceFileBasename;      //how the tracefiles should be named
-    const char *filemode;                  // either "random" or a fixed filename
-    const char *destAddress;
-    struct wavinfo **list;     // list of available wavfiles
-    VoIP_fileList *traceList;
+    IPvXAddress destAddress;
+    int voipPktSize;                // size of VoIP packets
+    int voipHeaderSize;
+    int voipSilenceThreshold;       // the maximum amplitude of a silence packet
+    int sampleRate;                 // samples/sec [Hz]
+    short int sampleBits;           // bits/sample (8,16,32)  // the 24 is not supported by ffmpeg
+    const char *codec;
+    int compressedBitRate;
+    simtime_t packetTimeLength;
+    const char *soundFile;          // input audio file name
+    int repeatCount;
+    const char *traceFileName;      // how the tracefiles should be named
 
-    simtime_t intArrTime;     // VOIP packet interarrival time
-    simtime_t simTimeLimit; //Simulation Time Limit
+    int voipSilenceSize;            // size of a silence packet
+    int noWavFiles;                 // number of VoIP wav files available
 
-    char* charVal;        // pointer to character array used for int-char[] conversions
+    enum SampleFormat sampleFormat; // ffmpeg: enum SampleFormat
+    AVFormatContext *pFormatCtx;
+    AVCodecContext *pCodecCtx;
+    AVCodec *pCodec;                // input decoder codec
+    ReSampleContext *pReSampleCtx;
+    AVCodecContext *pEncoderCtx;
+    AVCodec *pCodecEncoder;         // output encoder codec
+    int streamIndex;
+    int unreadSamples;
+    uint32_t pktID;                 // increasing packet sequence number
+    bool writeTracesToDisk;         // bool value - parameter if VoIP tracefiles should be written to disk
+    int samplesPerPacket;
 
+    char *samplePtr;
+    char *newSamples;
+    char *samples;
+
+    cMessage timer;
 };
-#endif
 
-int filter(struct dirent *e);
- 
-/***************************************************************************
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- ***************************************************************************/
+#endif //VOIPTOOL_VOIPGENERATOR_H

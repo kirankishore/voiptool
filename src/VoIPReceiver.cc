@@ -1,14 +1,14 @@
 
-#include "VoIPSink.h"
+#include "VoIPReceiver.h"
 
 #include "INETEndians.h"
 
-Define_Module(VoIPSink);
+Define_Module(VoIPReceiver);
 
-void VoIPSink::initialize()
+void VoIPReceiver::initialize()
 {
 	// Say Hello to the world
-	ev << "VoIPSink initialize()" << endl;
+	ev << "VoIPReceiver initialize()" << endl;
 	pktno = 0;
 	audiostream = -1;
 	pCodec726Enc = NULL;
@@ -55,7 +55,7 @@ void VoIPSink::initialize()
 	bindToPort(localPort);
 }
 
-void VoIPSink::handleMessage(cMessage *msg)
+void VoIPReceiver::handleMessage(cMessage *msg)
 {
 	VoIP_fileList *traceList=NULL;
 	VoIP_fileEntry *pkt=NULL;
@@ -75,7 +75,7 @@ void VoIPSink::handleMessage(cMessage *msg)
 	}
 }
 
-void VoIPSink::handleMessage2(cMessage *msg)
+void VoIPReceiver::handleMessage2(cMessage *msg)
 {
 	VoIPPacket *ip=NULL;
 	
@@ -152,7 +152,7 @@ void VoIPSink::handleMessage2(cMessage *msg)
 	delete ip;
 }
 
-void VoIPSink::encodeNextPacket()
+void VoIPReceiver::encodeNextPacket()
 {
 	int g726_size, pcm_size;
 	int16_t *newSamples;
@@ -173,7 +173,7 @@ void VoIPSink::encodeNextPacket()
 	fwrite(newSamples, 2, pcm_size, degenerated);
 }
 
-int VoIPSink::readNextFrame()
+int VoIPReceiver::readNextFrame()
 {
 	int frame_size, new_frame_size;
 	int i;
@@ -243,7 +243,7 @@ int VoIPSink::readNextFrame()
 	return 0;
 }
 
-void VoIPSink::writeFakeWavHeader(const char *filename)
+void VoIPReceiver::writeFakeWavHeader(const char *filename)
 {
 	/* RIFF WAVE format header:
 	"RIFF"             -          4 bytes
@@ -307,7 +307,7 @@ void VoIPSink::writeFakeWavHeader(const char *filename)
 	fclose(fp);
 }
 
-void VoIPSink::initializeAudio()
+void VoIPReceiver::initializeAudio()
 {
 	// open input file
 	if(av_open_input_file(&pFormatCtx, cur_file, NULL, 0, NULL)!=0)
@@ -388,7 +388,7 @@ void VoIPSink::initializeAudio()
 	    resample = false;
 }
 
-void VoIPSink::correctWavHeader(const char *filename)
+void VoIPReceiver::correctWavHeader(const char *filename)
 {
 	struct stat statbuf;
 	FILE *fp;
@@ -407,7 +407,7 @@ void VoIPSink::correctWavHeader(const char *filename)
 	fclose(fp);
 }
 
-void VoIPSink::finish()
+void VoIPReceiver::finish()
 {
 	struct stat statbuf;
 	ev << "Sink finish()" << endl;
