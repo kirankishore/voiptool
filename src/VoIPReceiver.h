@@ -31,7 +31,11 @@ class VoIPReceiver : public UDPAppBase
 		virtual void finish();
 		
 		void initializeAudio();
-		void handleMessage2(cMessage *msg);
+		bool createConnect(VoIPPacket *vp);
+		bool checkConnect(VoIPPacket *vp);
+		void closeConnect();
+		void handleVoIPMessage(VoIPPacket *vp);
+		void decodePacket(VoIPPacket *vp);
 		
 		//write Fake Header without information about the length of the file... the length will be added later (since the length is still unknown)
 		void writeFakeWavHeader(const char *filename);
@@ -72,6 +76,9 @@ class VoIPReceiver : public UDPAppBase
 		AVPacket packet;
 		FILE *original;			// file pointer to original audiofile (after resampling, will be created)
 		FILE *degenerated;		// file pointer to degenerated file (inkl. codec loss, packet loss and silence packets)
+		cMessage timer;
+		simtime_t timeout;
+		bool offline;
 };
 
 #endif // VOIPTOOL_VOIPSINK_H

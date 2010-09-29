@@ -7,6 +7,7 @@ Define_Module(VoIPReceiver);
 
 void VoIPReceiver::initialize()
 {
+    UDPAppBase::initialize();
 	// Say Hello to the world
 	ev << "VoIPReceiver initialize()" << endl;
 	pktno = 0;
@@ -22,6 +23,7 @@ void VoIPReceiver::initialize()
 	originalWavFileName = par("originalWavFileName").stringValue();
 	degeneratedWavFileName = par("degeneratedWavFileName").stringValue();
 	resultFile = par("resultFile").stringValue();
+	timeout = par("timeout");
 	
 	//initialize avcodec library
 	av_register_all();
@@ -57,99 +59,119 @@ void VoIPReceiver::initialize()
 
 void VoIPReceiver::handleMessage(cMessage *msg)
 {
-	VoIP_fileList *traceList=NULL;
-	VoIP_fileEntry *pkt=NULL;
-	traceList = VoIPGenerator::getList();
-	switch(msg->getKind())
-	{
-		case SINK_INIT_TRG:
-			pkt = traceList->getPacket(pktno);
-			strcpy(cur_file, pkt->getWaveFile());
-			initializeAudio();
-			delete msg;
-			break;
-
-		default:
-			handleMessage2(msg);
-			break;
-	}
+    if (msg->isSelfMessage())
+    {
+        // msg == &timer
+        if (!offline)
+            closeConnect();
+    }
+    else
+    {
+        VoIPPacket *vp = dynamic_cast<VoIPPacket *>(msg);
+        if(vp)
+            handleVoIPMessage(vp);
+        else
+            delete msg;
+    }
 }
 
-void VoIPReceiver::handleMessage2(cMessage *msg)
+bool VoIPReceiver::createConnect(VoIPPacket *vp)
 {
-	VoIPPacket *ip=NULL;
-	
-	VoIP_fileList *traceList=NULL;
-	VoIP_fileEntry *pkt=NULL;
-	
-	traceList = VoIPGenerator::getList();
-	
-	ip = (VoIPPacket *)(PK(msg)->decapsulate());
-	delete msg;
-	if(ip == NULL)
-	{
-		ev << "Sink: Unknown Packet received!" << endl;
-		return;
-	}
-	switch(ip->getKind())
-	{
-		case VOICE:
-			ev << "Sink: VoIP Packet received!" << endl;
-			pkt = traceList->getPacket(pktno++);
-			if(strcmp(cur_file, pkt->getWaveFile()) != 0)
-			{
-				cerr << "Changing audio file!" << endl;
-				cur_file = pkt->getWaveFile();
-				avcodec_close(pCodecCtx);
-				avcodec_close(p726EncCtx);
-				avcodec_close(p726DecCtx);
-				av_free(p726EncCtx);
-				av_free(p726EncCtx);
-				av_close_input_file(pFormatCtx);
-				unreadSamples = 0;
-				psamples = 0;
-				startPos = -1;
-				initializeAudio();
-			}
-			if(unreadSamples < samplesPerPacket) 
-			{
-				if(readNextFrame() == -1)
-				{
-					cerr << cur_file << endl;
-					cerr << pkt->getWaveFile() << endl;
-					pkt = traceList->getPacket(pktno++);
-					cerr << pkt->getWaveFile() << endl;
-					error("readNextFrame failed - canceling simulation!");
-				}
-			}
-			//write to original wav file the unaltered packet
-			fwrite(&samples[psamples], 2, samplesPerPacket, original);
-			if(ip->hasBitError())
-			{
-				ev << "Errorflag: 1!" << endl;
-				transmissionErrors++;
-				pkt->setBitErrorRate(true);
-				// in case of an transmission error, silence is inserted into the output. There might be
-				// smarter algorithms to hide those errors, but this is not part of this simple demonstration
-				for(int i=psamples; i<(psamples+samplesPerPacket); i++)
-				    samples[i]=0;
-			}
-			pkt->setPacketNo(pktno);
-			pkt->setArrivalTime(simTime());
-			if(ip->getType() == SILENT)
-			{
-				//silence packet, insert silence!
-				numberOfVoIpSilence++;
-				for(int i=psamples; i<(psamples+samplesPerPacket); i++)
-				    samples[i]=0;
-			}
-			encodeNextPacket();
-			break;
+    //FIXME implementation: save sender info, create output file if need
+    offline = false;
+    return true;
+}
 
-		default:
-			ev << "Sink: Unknown Packet received!" << endl;
-	}
-	delete ip;
+bool VoIPReceiver::checkConnect(VoIPPacket *vp)
+{
+    //FIXME implementation: compare sender info with saved
+}
+
+void VoIPReceiver::closeConnect()
+{
+    //FIXME implementation: close output file if need
+    offline = true;
+}
+
+void VoIPReceiver::handleVoIPMessage(VoIPPacket *vp)
+{
+    bool ok = (offline) ? createConnect(vp) : checkConnect(vp);
+    if(!ok)
+    {
+        delete vp;
+        return;
+    }
+
+    if (timer.isScheduled())
+    {
+        //FIXME unschedule timer
+    }
+    cancelEvent(&timer);
+    scheduleAt(simTime() + timeout, &timer);
+    decodePacket(vp);
+
+	delete vp;
+}
+
+void VoIPReceiver::decodePacket(VoIPPacket *vp)
+{
+    switch(vp->getKind())
+    {
+        case VOICE:
+            ev << "Sink: VoIP Packet received!" << endl;
+            if(strcmp(cur_file, pkt->getWaveFile()) != 0)
+            {
+                cerr << "Changing audio file!" << endl;
+                cur_file = pkt->getWaveFile();
+                avcodec_close(pCodecCtx);
+                avcodec_close(p726EncCtx);
+                avcodec_close(p726DecCtx);
+                av_free(p726EncCtx);
+                av_free(p726DecCtx);
+                av_close_input_file(pFormatCtx);
+                unreadSamples = 0;
+                psamples = 0;
+                startPos = -1;
+                initializeAudio();
+            }
+            if(unreadSamples < samplesPerPacket)
+            {
+                if(readNextFrame() == -1)
+                {
+                    cerr << cur_file << endl;
+                    cerr << pkt->getWaveFile() << endl;
+                    pkt = traceList->getPacket(pktno++);
+                    cerr << pkt->getWaveFile() << endl;
+                    error("readNextFrame failed - canceling simulation!");
+                }
+            }
+            //write to original wav file the unaltered packet
+            fwrite(&samples[psamples], 2, samplesPerPacket, original);
+            if(vp->hasBitError())
+            {
+                ev << "Errorflag: 1!" << endl;
+                transmissionErrors++;
+                pkt->setBitErrorRate(true);
+                // in case of an transmission error, silence is inserted into the output. There might be
+                // smarter algorithms to hide those errors, but this is not part of this simple demonstration
+                for(int i=psamples; i<(psamples+samplesPerPacket); i++)
+                    samples[i]=0;
+            }
+            pkt->setPacketNo(pktno);
+            pkt->setArrivalTime(simTime());
+            if(vp->getType() == SILENT)
+            {
+                //silence packet, insert silence!
+                numberOfVoIpSilence++;
+                for(int i=psamples; i<(psamples+samplesPerPacket); i++)
+                    samples[i]=0;
+            }
+            encodeNextPacket();
+            break;
+
+        default:
+            ev << "Sink: Unknown Packet received!" << endl;
+    }
 }
 
 void VoIPReceiver::encodeNextPacket()
@@ -413,63 +435,16 @@ void VoIPReceiver::finish()
 	ev << "Sink finish()" << endl;
 	char command[1000];
 	const char *last;
-	double pesqValue;
 	int len;
-	FILE *in;
-	FILE *result;
 	fclose(original);
 	fclose(degenerated);
 	correctWavHeader(originalWavFileName);
 	correctWavHeader(degeneratedWavFileName);
-	result = fopen(resultFile, "at");
 	sprintf(command, "[Run %s %d]\n", ev.getConfigEx()->getActiveConfigName(), ev.getConfigEx()->getActiveRunNumber());
-	fputs(command, result);
 	sprintf(command, "total number of VoIP packets:\t%d\n", pktno);
-	fputs(command, result);
 	sprintf(command, "number of transmission errors:\t%d\n", transmissionErrors);
-	fputs(command, result);
 	sprintf(command, "number of silence packets:\t%d\n", numberOfVoIpSilence);
-	fputs(command, result);
 	delete[] samples; samples = NULL;
 	delete[] g726buf; g726buf = NULL;
-	if(computePesqValue)
-	{
-		if(stat("pesq", &statbuf) != 0) // Check if file exists
-		{
-			error("computePesqValue is enabled, but an error occured ");
-		}
-		sprintf(command, "./pesq +%d %s %s >/dev/null", G726_SAMPLERATE, originalWavFileName, degeneratedWavFileName);
-		//make sure, the file doesn't exist
-		remove("_pesq_results.txt");
-		system(command);
-		in = fopen("_pesq_results.txt", "rt");
-		if(in == NULL)
-		{
-			ev << "Ooops! what happened ? for some reason, the pesq tool did not create the output files... did you download the correct version?" << endl;
-			fclose(result);
-			return;
-		}
-		fgets(command, 1000, in); // ignore first line
-		fgets(command, 1000, in);
-		fclose(in);
-		
-		//delete files created by the pesq programm
-		remove("_pesq_results.txt");
-		remove("_pesq_itu_results.txt");
-		// find the last occurence of / in the filename, since in the file _pesq_results.txt, only the filename is written, the path is omitted
-		last = strrchr(degeneratedWavFileName, '/');
-		if(last == NULL)
-			len = strlen(degeneratedWavFileName);
-		else 
-		{
-			last++;
-			len = strlen(last);
-		}
-		pesqValue = strtod(&(command[len]), NULL);
-		ev << "pesq Value: " << pesqValue << endl;
-		//here should be the filename of the degenerated file
-		sprintf(command, "pesq Value: %lf\n", pesqValue);
-		fputs(command, result);
-	}
 	fclose(result);
 }

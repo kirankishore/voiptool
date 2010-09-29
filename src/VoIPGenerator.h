@@ -61,6 +61,7 @@ class INET_API VoIPGenerator : public UDPAppBase
     int voipSilenceThreshold;       // the maximum amplitude of a silence packet
     int sampleRate;                 // samples/sec [Hz]
     short int sampleBits;           // bits/sample (8,16,32)  // the 24 is not supported by ffmpeg
+    short int sampleBytes;          // bytes/sample (1,2,4)  // the 3 is not supported by ffmpeg
     const char *codec;
     int compressedBitRate;
     simtime_t packetTimeLength;

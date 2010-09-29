@@ -26,7 +26,9 @@ Define_Module(VoIPGenerator);
 
 void VoIPGenerator::initialize(int stage)
 {
-    if(stage != 3)  //wait until stage 3 - The Adress resolver does not work before that!
+    UDPAppBase::initialize(stage);
+
+    if(stage != 3)  //wait until stage 3 - The Address resolver does not work before that!
         return;
 
     // say HELLO to the world
@@ -40,6 +42,15 @@ void VoIPGenerator::initialize(int stage)
     voipSilenceThreshold = par("voipSilenceThreshold");
     sampleRate = par("sampleRate");
     sampleBits = par("sampleBits");
+    switch(sampleBits)
+    {
+        case  8: sampleFormat = SAMPLE_FMT_U8;  break;
+        case 16: sampleFormat = SAMPLE_FMT_S16; break;
+        case 32: sampleFormat = SAMPLE_FMT_S32; break;
+        default:
+            error("Invalid sampleBits=%d parameter, valid values only 8, 16 or 32", sampleBits);
+    }
+    sampleBytes = sampleBits/8;
     codec = par("codec").stringValue();
     compressedBitRate = par("compressedBitRate");
     packetTimeLength = par("packetTimeLength");
@@ -50,7 +61,11 @@ void VoIPGenerator::initialize(int stage)
     simtime_t start = par("start");
 
     samplesPerPacket = (int)round(sampleRate * SIMTIME_DBL(packetTimeLength));
-    ev << "packetTimeLength parameter is " << packetTimeLength * 1000.0 << "ms, ";
+    int bytesPerPacket = samplesPerPacket * sampleBytes;
+    if (bytesPerPacket & 1)
+        samplesPerPacket++;
+
+    ev << "The packetTimeLength parameter is " << packetTimeLength * 1000.0 << "ms, ";
     packetTimeLength = ((double)samplesPerPacket) / sampleRate;
     ev << "recalculated to " << packetTimeLength * 1000.0 << "ms!" << endl;
 
@@ -172,9 +187,18 @@ VoIPPacket* VoIPGenerator::generatePacket()
     if (0 == samples)
         return NULL;
 
-    int sampleBytes = samples * (sampleBits/8);
-    bool isSilent = checkSilence(samplePtr, sampleBytes);
+    int samplesBytes = samples * (sampleBytes);
+    bool isSilent = checkSilence(samplePtr, samplesBytes);
     VoIPPacket *vp = new VoIPPacket();
+    int encoderBufSize = (int)(compressedBitRate * SIMTIME_DBL(packetTimeLength))/8+256;
+    uint8_t encoderBuf[encoderBufSize];
+    pEncoderCtx->frame_size = samples;
+    int encSize = avcodec_encode_audio(pEncoderCtx, encoderBuf, encoderBufSize, (short int*)samplePtr);
+    if (encSize <= 0)
+        error("avcodec_encode_audio() error: %d", encSize);
+
+    vp->setDataFromBuffer(encoderBuf, encSize);
+
     if (isSilent)
     {
         vp->setName("SILENT");
@@ -183,16 +207,9 @@ VoIPPacket* VoIPGenerator::generatePacket()
     }
     else
     {
-        int encoderBufSize = (int)(compressedBitRate * SIMTIME_DBL(packetTimeLength))/8+256;
-        uint8_t encoderBuf[encoderBufSize];
-        pEncoderCtx->frame_size = samples;
-        int encSize = avcodec_encode_audio(pEncoderCtx, encoderBuf, encoderBufSize, (short int*)samplePtr);
-        if (encSize <= 0)
-            error("avcodec_encode_audio() error: %d", encSize);
 
         vp->setName("VOICE");
         vp->setType(VOICE);
-        vp->setDataFromBuffer(encoderBuf, encSize);
         vp->setByteLength(voipHeaderSize + encSize);
     }
     vp->setSeqNo(pktID++);
@@ -200,7 +217,7 @@ VoIPPacket* VoIPGenerator::generatePacket()
     vp->setSampleRate(sampleRate);
     vp->setSamplebits(sampleBits);
 
-    samplePtr += sampleBytes;
+    samplePtr += samplesBytes;
     unreadSamples -= samples;
 
     return vp;
@@ -252,47 +269,50 @@ void VoIPGenerator::readFrame()
         return;
 
     if (unreadSamples)
-        memcpy(newSamples, samplePtr, unreadSamples * (sampleBits/8));
+        memcpy(newSamples, samplePtr, unreadSamples * sampleBytes);
     samplePtr = newSamples;
 
     AVPacket packet;
 
-    for(;;)
+    for (;;)
     {
         //read one frame
         int err = av_read_frame(pFormatCtx, &packet);
-        if(err < 0)
+        if (err < 0)
             break;
 
         // if the frame doesn't belong to our audiostream, continue... is not supposed to happen,
         // since .wav contain only one media stream
-        if(packet.stream_index != streamIndex)
+        if (packet.stream_index != streamIndex)
             continue;
 
         // packet length == 0 ? read next packet
-        if(packet.duration == 0)
+        if (packet.duration == 0)
             continue;
 
         // decode audio and save the decoded samples in our buffer
         int frame_size = AVCODEC_MAX_AUDIO_FRAME_SIZE;
-        int16_t *rbuf;
-        if (pReSampleCtx)
-            rbuf = (int16_t*)samples;
-        else
-            rbuf = (int16_t*)(newSamples + unreadSamples * (sampleBits/8));
+        int16_t *rbuf, *nbuf;
+        nbuf = (int16_t*)(newSamples + unreadSamples * sampleBytes);
+        rbuf = (pReSampleCtx) ? (int16_t*)samples : nbuf;
+
         frame_size = AVCODEC_MAX_AUDIO_FRAME_SIZE;
-        int decoded = avcodec_decode_audio2(pCodecCtx, rbuf, &frame_size, packet.data, packet.size);
+        int decoded = avcodec_decode_audio3(pCodecCtx, rbuf, &frame_size, &packet);
         if (decoded < 0)
             error("Error decoding frame, err=%d", decoded);
 
-        if(frame_size == 0)
+        if (frame_size == 0)
             continue;
 
-        if(pReSampleCtx)
+        if (decoded != packet.size)
+            error("Error decoding frame, not decoded the all samples of the frame (%d < %d)", decoded, packet.size);
+
+        decoded = frame_size / sampleBytes;
+        if (pReSampleCtx)
         {
-            decoded = audio_resample(pReSampleCtx, (int16_t *)(newSamples + unreadSamples * (sampleBits/8)),
-                    rbuf, decoded);
+            decoded = audio_resample(pReSampleCtx, nbuf, rbuf, decoded);
         }
+
         unreadSamples += decoded;
 
         av_free_packet(&packet);
