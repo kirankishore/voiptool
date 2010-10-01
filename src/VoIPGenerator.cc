@@ -215,7 +215,7 @@ VoIPPacket* VoIPGenerator::generatePacket()
     vp->setSeqNo(pktID++);
     vp->setCodec(pEncoderCtx->codec_id);
     vp->setSampleRate(sampleRate);
-    vp->setSamplebits(sampleBits);
+    vp->setSampleBits(sampleBits);
 
     samplePtr += samplesBytes;
     unreadSamples -= samples;
@@ -297,7 +297,7 @@ void VoIPGenerator::readFrame()
         rbuf = (pReSampleCtx) ? (int16_t*)samples : nbuf;
 
         frame_size = AVCODEC_MAX_AUDIO_FRAME_SIZE;
-        int decoded = avcodec_decode_audio3(pCodecCtx, rbuf, &frame_size, &packet);
+        int decoded = avcodec_decode_audio2(pCodecCtx, rbuf, &frame_size, packet.data, packet.size);
         if (decoded < 0)
             error("Error decoding frame, err=%d", decoded);
 

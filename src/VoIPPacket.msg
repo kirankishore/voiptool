@@ -27,8 +27,10 @@ enum G726Options
 packet VoIPPacket extends ByteArrayMessage
 {
     int type @enum(VoIPPacketType);
-    uint32_t seqNo;
+    uint16_t seqNo;
+    uint32_t timeStamp;
+    uint32_t ssrc;
     int codec;
-    short samplebits;
+    short sampleBits;
     int sampleRate;
 }

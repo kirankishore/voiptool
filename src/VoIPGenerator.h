@@ -28,11 +28,8 @@ extern "C" {
 };
 
 #include "IPAddressResolver.h"
-#include "SysMsg_m.h"
 #include "UDPAppBase.h"
 #include "UDPControlInfo_m.h"
-#include "VoIP_fileList.h"
-#include "VoIP_fileEntry.h"
 #include "VoIPPacket_m.h"
 
 //using namespace std;
