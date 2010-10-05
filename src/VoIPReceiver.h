@@ -22,7 +22,8 @@ extern "C" {
 class VoIPReceiver : public UDPAppBase
 {
   public:
-    VoIPReceiver() : samples(NULL), g726buf(NULL) {}
+    VoIPReceiver() : samples(NULL), g726buf(NULL), timer(NULL) {}
+    ~VoIPReceiver();
 	
   protected:
     virtual void initialize();
@@ -48,6 +49,7 @@ class VoIPReceiver : public UDPAppBase
         void addAudioStream(enum CodecID codec_id);
         void openAudio();
         void writeAudioFrame(uint8_t *buf, int len);
+        void writeLostFrames(int frameCount);
         void closeAudio();
 
         bool offline;
@@ -62,6 +64,7 @@ class VoIPReceiver : public UDPAppBase
         AVStream *audio_st;
         AVCodecContext *DecCtx;
         AVCodec *pCodecDec;
+        int pktBytes;
     };
 
   protected:
@@ -92,7 +95,7 @@ class VoIPReceiver : public UDPAppBase
     FILE *original;			// file pointer to original audiofile (after resampling, will be created)
     FILE *degenerated;		// file pointer to degenerated file (inkl. codec loss, packet loss and silence packets)
 */
-    cMessage timer;
+    cMessage *timer;
     static simsignal_t receivedBytes;
     static simsignal_t missingPackets;
     static simsignal_t droppedBytes;

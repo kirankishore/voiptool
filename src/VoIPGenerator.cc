@@ -24,6 +24,13 @@
 
 Define_Module(VoIPGenerator);
 
+
+VoIPGenerator::~VoIPGenerator()
+{
+    if (timer.isScheduled())
+        cancelEvent(&timer);
+}
+
 void VoIPGenerator::initialize(int stage)
 {
     UDPAppBase::initialize(stage);
@@ -134,7 +141,10 @@ void VoIPGenerator::finish()
 
 void VoIPGenerator::openSoundFile(const char *name)
 {
-    av_open_input_file(&pFormatCtx, name, NULL, 0, NULL);
+    int ret = av_open_input_file(&pFormatCtx, name, NULL, 0, NULL);
+    if (ret)
+        error("Audiofile '%s' open error: %d", name, ret);
+
     av_find_stream_info(pFormatCtx);
 
     //get stream number
@@ -192,7 +202,12 @@ VoIPPacket* VoIPGenerator::generatePacket()
     VoIPPacket *vp = new VoIPPacket();
     int encoderBufSize = (int)(compressedBitRate * SIMTIME_DBL(packetTimeLength))/8+256;
     uint8_t encoderBuf[encoderBufSize];
+    memset(encoderBuf, 0, encoderBufSize);
     pEncoderCtx->frame_size = samples;
+
+    // the 3rd parameter of avcodec_encode_audio() is the size of INPUT buffer!!!
+    // It's wrong in the FFMPEG documentation/header file!!!
+    encoderBufSize = samples;
     int encSize = avcodec_encode_audio(pEncoderCtx, encoderBuf, encoderBufSize, (short int*)samplePtr);
     if (encSize <= 0)
         error("avcodec_encode_audio() error: %d", encSize);
@@ -212,11 +227,13 @@ VoIPPacket* VoIPGenerator::generatePacket()
         vp->setType(VOICE);
         vp->setByteLength(voipHeaderSize + encSize);
     }
-    vp->setSeqNo(pktID++);
+    vp->setTimeStamp(pktID);
+    vp->setSeqNo(pktID);
     vp->setCodec(pEncoderCtx->codec_id);
     vp->setSampleRate(sampleRate);
     vp->setSampleBits(sampleBits);
 
+    pktID++;
     samplePtr += samplesBytes;
     unreadSamples -= samples;
 
@@ -307,7 +324,7 @@ void VoIPGenerator::readFrame()
         if (decoded != packet.size)
             error("Error decoding frame, not decoded the all samples of the frame (%d < %d)", decoded, packet.size);
 
-        decoded = frame_size / sampleBytes;
+        decoded = frame_size / sampleBytes / pCodecCtx->channels;
         if (pReSampleCtx)
         {
             decoded = audio_resample(pReSampleCtx, nbuf, rbuf, decoded);

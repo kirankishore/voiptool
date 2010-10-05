@@ -37,6 +37,7 @@ extern "C" {
 class INET_API VoIPGenerator : public UDPAppBase
 {
   public:
+    ~VoIPGenerator();
 
   protected:
     virtual void initialize(int stage);
