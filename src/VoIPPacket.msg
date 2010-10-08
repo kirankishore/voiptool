@@ -1,11 +1,20 @@
-// **************************************************************************
-//                               VoIPPacket.msg
-//             Omnett++ Message definition file for VoIP packets
-//                             -------------------
-//    begin                : Mon Jul 18 2005
-//    copyright            : (C) 2005 by M. Bohge
-//    email                : bohge@tkn.tu-berlin.de
-// ***************************************************************************/
+//
+// Copyright (C) 2005 M. Bohge (bohge@tkn.tu-berlin.de), M. Renwanz
+// Copyright (C) 2010 Zoltan Bojthe
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU Lesser General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program; if not, see <http://www.gnu.org/licenses/>.
+//
 
 cplusplus {{
 #include "ByteArrayMessage.h"
@@ -19,18 +28,16 @@ enum VoIPPacketType
     SILENT = 2;
 }
 
-enum G726Options
-{
-    G726_SAMPLERATE = 8000;
-}
-
 packet VoIPPacket extends ByteArrayMessage
 {
     int type @enum(VoIPPacketType);
-    uint16_t seqNo;
-    uint32_t timeStamp;
-    uint32_t ssrc;
+
     int codec;
     short sampleBits;
     int sampleRate;
+    int samplesPerPackets;
+
+    uint16_t seqNo;
+    uint32_t timeStamp;
+    uint32_t ssrc;
 }

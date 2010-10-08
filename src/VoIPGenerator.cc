@@ -1,26 +1,22 @@
-
-/***************************************************************************
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- ***************************************************************************/
-
-/**************************************************************************
-             TrafficGenerator.cc  -  simple traffic generator
-                             -------------------
-    begin                : Wed Jul 13 2005
-    copyright            : (C) 2005 by M. Bohge
-    email                : bohge@tkn.tu-berlin.de
-    last modified        : added VoIP wav-tracinng - by M. Renwanz   
- ***************************************************************************/
-
-// TODO: Zeile 310 - berechnung der Position korrekt ?
+//
+// Copyright (C) 2005 M. Bohge (bohge@tkn.tu-berlin.de), M. Renwanz
+// Copyright (C) 2010 Zoltan Bojthe
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU Lesser General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program; if not, see <http://www.gnu.org/licenses/>.
+//
 
 #include "VoIPGenerator.h"
-
 
 Define_Module(VoIPGenerator);
 
@@ -29,6 +25,17 @@ VoIPGenerator::~VoIPGenerator()
 {
     if (timer.isScheduled())
         cancelEvent(&timer);
+}
+
+VoIPGenerator::Buffer::Buffer()
+{
+    samples = new char[BUFSIZE];
+    clear();
+}
+
+VoIPGenerator::Buffer::~Buffer()
+{
+    delete[] samples;
 }
 
 void VoIPGenerator::initialize(int stage)
@@ -76,11 +83,7 @@ void VoIPGenerator::initialize(int stage)
     packetTimeLength = ((double)samplesPerPacket) / sampleRate;
     ev << "recalculated to " << packetTimeLength * 1000.0 << "ms!" << endl;
 
-    samplePtr = NULL;
-    // Buffer for audio samples
-    samples = new char[AVCODEC_MAX_AUDIO_FRAME_SIZE];
-    newSamples = new char[AVCODEC_MAX_AUDIO_FRAME_SIZE];
-    samplePtr = newSamples;
+    sampleBuffer.clear();
 
     // initialize avcodec library
     av_register_all();
@@ -111,22 +114,28 @@ void VoIPGenerator::handleMessage(cMessage *msg)
 
     if (msg->isSelfMessage())
     {
-        packet = generatePacket();
-        if(!packet)
+        if (msg == &timer)
         {
-            if (repeatCount > 0)
+            packet = generatePacket();
+            if(!packet)
             {
-                repeatCount--;
-                av_seek_frame(pFormatCtx, streamIndex, 0, 0);
-                packet = generatePacket();
+                if (repeatCount > 0)
+                {
+                    repeatCount--;
+                    av_seek_frame(pFormatCtx, streamIndex, 0, 0);
+                    packet = generatePacket();
+                }
+            }
+            if (packet)
+            {
+                // reschedule trigger message
+                scheduleAt(simTime() + packetTimeLength, packet);
+                scheduleAt(simTime() + packetTimeLength, msg);
             }
         }
-        if (packet)
+        else
         {
-            sendToUDP(packet, localPort, destAddress, destPort);
-
-            // reschedule trigger message
-            scheduleAt(simTime() + packetTimeLength, msg);
+            sendToUDP(PK(msg), localPort, destAddress, destPort);
         }
 
     }
@@ -190,15 +199,11 @@ void VoIPGenerator::openSoundFile(const char *name)
 VoIPPacket* VoIPGenerator::generatePacket()
 {
     readFrame();
-    if (unreadSamples == 0)
+    if (sampleBuffer.empty())
         return NULL;
 
-    int samples = std::min(unreadSamples, samplesPerPacket);
-    if (0 == samples)
-        return NULL;
-
-    int samplesBytes = samples * (sampleBytes);
-    bool isSilent = checkSilence(samplePtr, samplesBytes);
+    int samples = std::min(sampleBuffer.length()/sampleBytes, samplesPerPacket);
+    bool isSilent = checkSilence(sampleBuffer.readPtr(), samples);
     VoIPPacket *vp = new VoIPPacket();
     int encoderBufSize = (int)(compressedBitRate * SIMTIME_DBL(packetTimeLength))/8+256;
     uint8_t encoderBuf[encoderBufSize];
@@ -208,7 +213,7 @@ VoIPPacket* VoIPGenerator::generatePacket()
     // the 3rd parameter of avcodec_encode_audio() is the size of INPUT buffer!!!
     // It's wrong in the FFMPEG documentation/header file!!!
     encoderBufSize = samples;
-    int encSize = avcodec_encode_audio(pEncoderCtx, encoderBuf, encoderBufSize, (short int*)samplePtr);
+    int encSize = avcodec_encode_audio(pEncoderCtx, encoderBuf, encoderBufSize, (short int*)(sampleBuffer.readPtr()));
     if (encSize <= 0)
         error("avcodec_encode_audio() error: %d", encSize);
 
@@ -232,10 +237,10 @@ VoIPPacket* VoIPGenerator::generatePacket()
     vp->setCodec(pEncoderCtx->codec_id);
     vp->setSampleRate(sampleRate);
     vp->setSampleBits(sampleBits);
+    vp->setSamplesPerPackets(samplesPerPacket);
 
     pktID++;
-    samplePtr += samplesBytes;
-    unreadSamples -= samples;
+    sampleBuffer.readOffset += samples * sampleBytes;
 
     return vp;
 }
@@ -280,18 +285,28 @@ bool VoIPGenerator::checkSilence(void* _buf, int samples)
     return max < voipSilenceThreshold;
 }
 
+void VoIPGenerator::Buffer::align()
+{
+    if (readOffset)
+        memcpy(samples, samples+readOffset, length());
+    writeOffset -= readOffset;
+    readOffset = 0;
+}
+
 void VoIPGenerator::readFrame()
 {
-    if (unreadSamples >= samplesPerPacket)
+    if (sampleBuffer.length() >= samplesPerPacket * sampleBytes)
         return;
 
-    if (unreadSamples)
-        memcpy(newSamples, samplePtr, unreadSamples * sampleBytes);
-    samplePtr = newSamples;
+    sampleBuffer.align();
 
     AVPacket packet;
 
-    for (;;)
+    char *tmpSamples = NULL;
+    if(pReSampleCtx)
+        tmpSamples = new char[Buffer::BUFSIZE];
+
+    while(sampleBuffer.length() < samplesPerPacket * sampleBytes)
     {
         //read one frame
         int err = av_read_frame(pFormatCtx, &packet);
@@ -308,12 +323,11 @@ void VoIPGenerator::readFrame()
             continue;
 
         // decode audio and save the decoded samples in our buffer
-        int frame_size = AVCODEC_MAX_AUDIO_FRAME_SIZE;
         int16_t *rbuf, *nbuf;
-        nbuf = (int16_t*)(newSamples + unreadSamples * sampleBytes);
-        rbuf = (pReSampleCtx) ? (int16_t*)samples : nbuf;
+        nbuf = (int16_t*)(sampleBuffer.writePtr());
+        rbuf = (pReSampleCtx) ? (int16_t*)tmpSamples : nbuf;
 
-        frame_size = AVCODEC_MAX_AUDIO_FRAME_SIZE;
+        int frame_size = AVCODEC_MAX_AUDIO_FRAME_SIZE;
         int decoded = avcodec_decode_audio2(pCodecCtx, rbuf, &frame_size, packet.data, packet.size);
         if (decoded < 0)
             error("Error decoding frame, err=%d", decoded);
@@ -329,13 +343,9 @@ void VoIPGenerator::readFrame()
         {
             decoded = audio_resample(pReSampleCtx, nbuf, rbuf, decoded);
         }
-
-        unreadSamples += decoded;
-
+        sampleBuffer.writeOffset += decoded * sampleBytes;
         av_free_packet(&packet);
-
-        // number of packets in this frame, one sample = 2 bytes
-        if (unreadSamples >= samplesPerPacket)
-            break;
     }
+    if(pReSampleCtx)
+        delete[] tmpSamples;
 }

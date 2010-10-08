@@ -1,3 +1,22 @@
+//
+// Copyright (C) 2005 M. Bohge (bohge@tkn.tu-berlin.de), M. Renwanz
+// Copyright (C) 2010 Zoltan Bojthe
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU Lesser General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program; if not, see <http://www.gnu.org/licenses/>.
+//
+
+
 #ifndef VOIPTOOL_VOIPRECEIVER_H
 #define VOIPTOOL_VOIPRECEIVER_H
 
@@ -22,7 +41,7 @@ extern "C" {
 class VoIPReceiver : public UDPAppBase
 {
   public:
-    VoIPReceiver() : samples(NULL), g726buf(NULL), timer(NULL) {}
+    VoIPReceiver() : timer(NULL) {}
     ~VoIPReceiver();
 	
   protected:
@@ -38,10 +57,6 @@ class VoIPReceiver : public UDPAppBase
     void decodePacket(VoIPPacket *vp);
     static void initialiseStatics();
 
-    //write Fake Header without information about the length of the file... the length will be added later (since the length is still unknown)
-    void writeFakeWavHeader(const char *filename);
-    void correctWavHeader(const char *filename);
-
     class Connection
     {
       public:
@@ -49,7 +64,7 @@ class VoIPReceiver : public UDPAppBase
         void addAudioStream(enum CodecID codec_id);
         void openAudio();
         void writeAudioFrame(uint8_t *buf, int len);
-        void writeLostFrames(int frameCount);
+        void writeLostSamples(int sampleCount);
         void closeAudio();
 
         bool offline;
@@ -59,48 +74,31 @@ class VoIPReceiver : public UDPAppBase
         enum CodecID codec;
         short sampleBits;
         int sampleRate;
+        int samplesPerPackets;
+        simtime_t lastPacketFinish;
         AVFormatContext *oc;
         AVOutputFormat *fmt;
         AVStream *audio_st;
         AVCodecContext *DecCtx;
         AVCodec *pCodecDec;
-        int pktBytes;
     };
 
   protected:
     int localPort;
     simtime_t timeout;
+    simtime_t playOutDelay;
     const char *resultFile;
 
     Connection curConn;
 
-    int pktno;						// packet number for voip packets
-    int audiostream;					// audiostream number inside audiofile
-    int16_t *samples;					// buffer for 16 bit raw audio samples
-    uint8_t *g726buf;					// buffer for encoded g726 data
-    int unreadSamples;				// number of samples not processed yet
-    int startPos;						// startposition in samples buffer of the current frame
-    int psamples;					// current position in samples buffer
-    int transmissionErrors;
-    int numberOfVoIpSilence;
-/*
-    AVFormatContext *pFormatCtx;
-    AVCodecContext *p726EncCtx;
-    AVCodecContext *p726DecCtx;
-    ReSampleContext *pReSampleCtx;
-    AVCodec *pCodec;
-    AVCodec *pCodec726Enc;
-    AVCodec *pCodec726Dec;
-    AVPacket packet;
-    FILE *original;			// file pointer to original audiofile (after resampling, will be created)
-    FILE *degenerated;		// file pointer to degenerated file (inkl. codec loss, packet loss and silence packets)
-*/
     cMessage *timer;
-    static simsignal_t receivedBytes;
-    static simsignal_t missingPackets;
-    static simsignal_t droppedBytes;
-    static simsignal_t packetHasVoice;
-    static simsignal_t connState;
+    static simsignal_t receivedBytesSignal;
+    static simsignal_t lostSamplesSignal;
+    static simsignal_t lostPacketsSignal;
+    static simsignal_t droppedBytesSignal;
+    static simsignal_t packetHasVoiceSignal;
+    static simsignal_t connStateSignal;
+    static simsignal_t delaySignal;
 };
 
 #endif // VOIPTOOL_VOIPRECEIVER_H

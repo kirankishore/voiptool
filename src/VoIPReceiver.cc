@@ -1,17 +1,39 @@
+//
+// Copyright (C) 2005 M. Bohge (bohge@tkn.tu-berlin.de), M. Renwanz
+// Copyright (C) 2010 Zoltan Bojthe
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU Lesser General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program; if not, see <http://www.gnu.org/licenses/>.
+//
+
 
 #include "VoIPReceiver.h"
 
 #include "INETEndians.h"
 
-#define INT64_C(x) int64_t(x)
+// FIXME check on WINDOWS!!
+#define INT64_C(x) int64_t(x##ULL)
+// FIXME check on WINDOWS!!
 
 Define_Module(VoIPReceiver);
 
-simsignal_t VoIPReceiver::receivedBytes = SIMSIGNAL_NULL;
-simsignal_t VoIPReceiver::missingPackets = SIMSIGNAL_NULL;
-simsignal_t VoIPReceiver::droppedBytes = SIMSIGNAL_NULL;
-simsignal_t VoIPReceiver::packetHasVoice = SIMSIGNAL_NULL;
-simsignal_t VoIPReceiver::connState = SIMSIGNAL_NULL;
+simsignal_t VoIPReceiver::receivedBytesSignal = SIMSIGNAL_NULL;
+simsignal_t VoIPReceiver::lostSamplesSignal = SIMSIGNAL_NULL;
+simsignal_t VoIPReceiver::lostPacketsSignal = SIMSIGNAL_NULL;
+simsignal_t VoIPReceiver::droppedBytesSignal = SIMSIGNAL_NULL;
+simsignal_t VoIPReceiver::packetHasVoiceSignal = SIMSIGNAL_NULL;
+simsignal_t VoIPReceiver::connStateSignal = SIMSIGNAL_NULL;
+simsignal_t VoIPReceiver::delaySignal = SIMSIGNAL_NULL;
 
 VoIPReceiver::~VoIPReceiver()
 {
@@ -21,14 +43,16 @@ VoIPReceiver::~VoIPReceiver()
 
 void VoIPReceiver::initialiseStatics()
 {
-    if (receivedBytes != SIMSIGNAL_NULL)
+    if (receivedBytesSignal != SIMSIGNAL_NULL)
         return;
 
-    receivedBytes = registerSignal("receivedBytes");
-    missingPackets = registerSignal("missingPackets");
-    droppedBytes  = registerSignal("droppedBytes");
-    packetHasVoice = registerSignal("packetHasVoice");
-    connState = registerSignal("connState");
+    receivedBytesSignal = registerSignal("receivedBytes");
+    lostSamplesSignal = registerSignal("lostSamples");
+    lostPacketsSignal = registerSignal("lostPackets");
+    droppedBytesSignal  = registerSignal("droppedBytes");
+    packetHasVoiceSignal = registerSignal("packetHasVoice");
+    connStateSignal = registerSignal("connState");
+    delaySignal = registerSignal("delay");
 }
 
 void VoIPReceiver::initialize()
@@ -45,10 +69,10 @@ void VoIPReceiver::initialize()
 	localPort = par("localPort");
 	timeout = par("timeout");
 	resultFile = par("resultFile");
-	
+
 	//initialize avcodec library
 	av_register_all();
-	
+
 	bindToPort(localPort);
 }
 
@@ -126,10 +150,9 @@ void get_audio_frame(int16_t *samples, int frame_size, int nb_channels)
 */
 }
 
-void VoIPReceiver::Connection::writeLostFrames(int frameCount)
+void VoIPReceiver::Connection::writeLostSamples(int sampleCount)
 {
-    if (pktBytes <= 0)
-        return;
+    int pktBytes = sampleCount * sampleBits / 8;
 
     AVCodecContext *c;
     c = audio_st->codec;
@@ -137,24 +160,21 @@ void VoIPReceiver::Connection::writeLostFrames(int frameCount)
     uint8_t decBuf[pktBytes];
     memset(decBuf, 0, pktBytes);
     AVPacket pkt;
+
     av_init_packet(&pkt);
 
-    for ( ; frameCount > 0 && pktBytes > 0; frameCount--)
-    {
+    // the 3rd parameter of avcodec_encode_audio() is the size of INPUT buffer!!!
+    // It's wrong in the FFMPEG documentation/header file!!!
+    pkt.size = avcodec_encode_audio(c, outbuf, pktBytes, (short int*)decBuf);
+    if (c->coded_frame->pts != AV_NOPTS_VALUE)
+        pkt.pts= av_rescale_q(c->coded_frame->pts, c->time_base, audio_st->time_base);
+    pkt.flags |= PKT_FLAG_KEY;
+    pkt.stream_index= audio_st->index;
+    pkt.data = outbuf;
 
-        // the 3rd parameter of avcodec_encode_audio() is the size of INPUT buffer!!!
-        // It's wrong in the FFMPEG documentation/header file!!!
-        pkt.size = avcodec_encode_audio(c, outbuf, pktBytes, (short int*)decBuf);
-        if (c->coded_frame->pts != AV_NOPTS_VALUE)
-            pkt.pts= av_rescale_q(c->coded_frame->pts, c->time_base, audio_st->time_base);
-        pkt.flags |= PKT_FLAG_KEY;
-        pkt.stream_index= audio_st->index;
-        pkt.data = outbuf;
-
-        // write the compressed frame in the media file
-        if (av_interleaved_write_frame(oc, &pkt) != 0)
-            throw cRuntimeError("Error while writing audio frame\n");
-    }
+    // write the compressed frame in the media file
+    if (av_interleaved_write_frame(oc, &pkt) != 0)
+        throw cRuntimeError("Error while writing audio frame\n");
 }
 
 void VoIPReceiver::Connection::writeAudioFrame(uint8_t *inbuf, int inbytes)
@@ -171,11 +191,10 @@ void VoIPReceiver::Connection::writeAudioFrame(uint8_t *inbuf, int inbytes)
 
     c = audio_st->codec;
 
+    lastPacketFinish += simtime_t(1.0) * (decBufSize * 8 / sampleBits) / sampleRate;
 //    get_audio_frame(inbuf, audio_input_frame_size, c->channels);
 
     int outbufSize = decBufSize;
-    if (pktBytes < decBufSize)
-        pktBytes = decBufSize;
     uint8_t outbuf[outbufSize];
     // the 3rd parameter of avcodec_encode_audio() is the size of INPUT buffer!!!
     // It's wrong in the FFMPEG documentation/header file!!!
@@ -205,6 +224,8 @@ bool VoIPReceiver::createConnect(VoIPPacket *vp)
     if (!curConn.offline)
         return false;
 
+    emit(connStateSignal, 1);
+
     curConn.offline = false;
     curConn.seqNo = vp->getSeqNo() - 1;
     curConn.timeStamp = vp->getTimeStamp();
@@ -212,7 +233,8 @@ bool VoIPReceiver::createConnect(VoIPPacket *vp)
     curConn.codec = (enum CodecID)(vp->getCodec());
     curConn.sampleBits = vp->getSampleBits();
     curConn.sampleRate = vp->getSampleRate();
-    curConn.pktBytes = 0;
+    curConn.samplesPerPackets = vp->getSamplesPerPackets();
+    curConn.lastPacketFinish = simTime() + playOutDelay;
 
     curConn.DecCtx = avcodec_alloc_context();
 
@@ -285,6 +307,7 @@ bool VoIPReceiver::checkConnect(VoIPPacket *vp)
             && vp->getCodec() == curConn.codec
             && vp->getSampleBits() == curConn.sampleBits
             && vp->getSampleRate() == curConn.sampleRate
+            && vp->getSamplesPerPackets() == curConn.samplesPerPackets
             && vp->getSeqNo() > curConn.seqNo
             && vp->getTimeStamp() > curConn.timeStamp
             ;
@@ -296,6 +319,7 @@ void VoIPReceiver::closeConnect()
     {
         avcodec_close(curConn.DecCtx);
         //FIXME implementation: delete buffers, close output file if need
+        emit(connStateSignal, 0);
         curConn.offline = true;
 
         /* write the trailer, if any.  the trailer must be written
@@ -309,7 +333,7 @@ void VoIPReceiver::closeConnect()
             curConn.closeAudio();
 
         /* free the streams */
-        for(int i = 0; i < curConn.oc->nb_streams; i++)
+        for(unsigned int i = 0; i < curConn.oc->nb_streams; i++)
         {
             av_freep(&curConn.oc->streams[i]->codec);
             av_freep(&curConn.oc->streams[i]);
@@ -329,10 +353,15 @@ void VoIPReceiver::closeConnect()
 
 void VoIPReceiver::handleVoIPMessage(VoIPPacket *vp)
 {
+    long int bytes = (long int)vp->getByteLength();
     bool ok = (curConn.offline) ? createConnect(vp) : checkConnect(vp);
-    if(!ok)
+    if(ok)
     {
-        emit(droppedBytes, (long int)vp->getByteLength());
+        emit(receivedBytesSignal, bytes);
+    }
+    else
+    {
+        emit(droppedBytesSignal, bytes);
         delete vp;
         return;
     }
@@ -350,8 +379,11 @@ void VoIPReceiver::decodePacket(VoIPPacket *vp)
     switch(vp->getType())
     {
         case VOICE:
+            emit(packetHasVoiceSignal, 1);
+            break;
+
         case SILENT:
-            ev << "VoIP Packet received!" << endl;
+            emit(packetHasVoiceSignal, 0);
             break;
 
         default:
@@ -359,13 +391,18 @@ void VoIPReceiver::decodePacket(VoIPPacket *vp)
             return;
     }
     uint16_t newSeqNo = vp->getSeqNo();
-    int lostPackets = newSeqNo - (curConn.seqNo + 1);
     if (newSeqNo > curConn.seqNo + 1)
+        emit(lostPacketsSignal, newSeqNo - (curConn.seqNo + 1));
+    if (simTime() > curConn.lastPacketFinish)
     {
-        ev << "Lost " << lostPackets << " packet(s)\n";
-        emit(missingPackets, lostPackets);
-        curConn.writeLostFrames(lostPackets);
+        int lostSamples = (int)SIMTIME_DBL((simTime() - curConn.lastPacketFinish) * curConn.sampleRate);
+        ev << "Lost " << lostSamples << " samples\n";
+        emit(lostSamplesSignal, lostSamples);
+        curConn.writeLostSamples(lostSamples);
+        curConn.lastPacketFinish = simTime();
     }
+    emit(delaySignal, curConn.lastPacketFinish - vp->getCreationTime());
+    curConn.seqNo = newSeqNo;
     int len = vp->getDataArraySize();
     uint8_t buff[len];
     vp->copyDataToBuffer(buff, len);
@@ -374,17 +411,6 @@ void VoIPReceiver::decodePacket(VoIPPacket *vp)
 
 void VoIPReceiver::finish()
 {
-	struct stat statbuf;
 	ev << "Sink finish()" << endl;
-	char command[1000];
-	const char *last;
-	int len;
 	closeConnect();
-//	sprintf(command, "[Run %s %d]\n", ev.getConfigEx()->getActiveConfigName(), ev.getConfigEx()->getActiveRunNumber());
-//	sprintf(command, "total number of VoIP packets:\t%d\n", pktno);
-//	sprintf(command, "number of transmission errors:\t%d\n", transmissionErrors);
-//	sprintf(command, "number of silence packets:\t%d\n", numberOfVoIpSilence);
-//	delete[] samples; samples = NULL;
-//	delete[] g726buf; g726buf = NULL;
-//	fclose(result);
 }

@@ -19,10 +19,18 @@ import inet.nodes.ethernet.EtherSwitch;
 import inet.networklayer.autorouting.FlatNetworkConfigurator;
 
 
-channel fiberline extends ned.DatarateChannel
+channel line1 extends ned.DatarateChannel
 {
     parameters:
-        delay = 1us;
+        delay = 100us;
+//        datarate = 10Mbps;
+}
+
+channel line2 extends ned.DatarateChannel
+{
+    parameters:
+        delay = 100us;
+//        datarate = 10Mbps;
 }
 
 
@@ -56,8 +64,8 @@ network VoIPToolTest
                 @display("p=495,160;i=block/cogwheel_s");
         }
     connections:
-        client.ethg++ <--> switch.ethg++;
-        router.ethg++ <--> switch.ethg++;
-        router.ethg++ <--> fiberline <--> net.ethg++;
-        server.ethg++ <--> fiberline <--> net.ethg++;
+        client.ethg++ <--> line1 <--> switch.ethg++;
+        router.ethg++ <--> line1 <--> switch.ethg++;
+        router.ethg++ <--> line2 <--> net.ethg++;
+        server.ethg++ <--> line2 <--> net.ethg++;
 }

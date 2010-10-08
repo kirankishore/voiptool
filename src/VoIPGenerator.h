@@ -1,19 +1,21 @@
-/***************************************************************************
- *                                                                         *
- *   This program is free software; you can redistribute it and/or modify  *
- *   it under the terms of the GNU General Public License as published by  *
- *   the Free Software Foundation; either version 2 of the License, or     *
- *   (at your option) any later version.                                   *
- *                                                                         *
- ***************************************************************************/
+//
+// Copyright (C) 2005 M. Bohge (bohge@tkn.tu-berlin.de), M. Renwanz
+// Copyright (C) 2010 Zoltan Bojthe
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU Lesser General Public License
+// as published by the Free Software Foundation; either version 2
+// of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program; if not, see <http://www.gnu.org/licenses/>.
+//
 
-/***************************************************************************
-                 TrafficGenerator.h  -  simple traffic generator
-                             -------------------
-    begin                : Wed Jul 13 2005
-    copyright            : (C) 2005 by M. Bohge
-    email                : bohge@tkn.tu-berlin.de
- ***************************************************************************/
 
 #ifndef VOIPTOOL_VOIPGENERATOR_H
 #define VOIPTOOL_VOIPGENERATOR_H
@@ -51,6 +53,24 @@ class INET_API VoIPGenerator : public UDPAppBase
     void readFrame();
 
   protected:
+    class Buffer
+    {
+      public:
+        enum { BUFSIZE = AVCODEC_MAX_AUDIO_FRAME_SIZE };
+        char *samples;
+        int readOffset;
+        int writeOffset;
+      public:
+        Buffer();
+        ~Buffer();
+        void clear() { readOffset = 0; writeOffset = 0; }
+        int length() const {return writeOffset-readOffset; }
+        bool empty() const {return writeOffset <= readOffset; }
+        char* readPtr() { return samples + readOffset; }
+        char* writePtr() { return samples + writeOffset; }
+        int availableSpace() const {return BUFSIZE - writeOffset; }
+        void align();
+    };
     int localPort;
     int destPort;
     IPvXAddress destAddress;
@@ -78,14 +98,10 @@ class INET_API VoIPGenerator : public UDPAppBase
     AVCodecContext *pEncoderCtx;
     AVCodec *pCodecEncoder;         // output encoder codec
     int streamIndex;
-    int unreadSamples;
     uint32_t pktID;                 // increasing packet sequence number
     bool writeTracesToDisk;         // bool value - parameter if VoIP tracefiles should be written to disk
     int samplesPerPacket;
-
-    char *samplePtr;
-    char *newSamples;
-    char *samples;
+    Buffer sampleBuffer;
 
     cMessage timer;
 };
