@@ -17,8 +17,8 @@
 //
 
 
-#ifndef VOIPTOOL_VOIPRECEIVER_H
-#define VOIPTOOL_VOIPRECEIVER_H
+#ifndef VOIPTOOL_VOIPSINKAPP_H
+#define VOIPTOOL_VOIPSINKAPP_H
 
 #include <omnetpp.h>
 
@@ -34,28 +34,26 @@ extern "C" {
 #include "UDPAppBase.h"
 #include "UDPControlInfo_m.h"
 
-#include "VoIPGenerator.h"
 #include "VoIPPacket_m.h"
 
 
-class VoIPReceiver : public UDPAppBase
+class VoIPSinkApp : public UDPAppBase
 {
   public:
-    VoIPReceiver() : timer(NULL) {}
-    ~VoIPReceiver();
+    VoIPSinkApp() : timer(NULL) {}
+    ~VoIPSinkApp();
 	
   protected:
     virtual void initialize();
     virtual void handleMessage(cMessage *msg);
     virtual void finish();
 
-    void initializeAudio();
-    bool createConnect(VoIPPacket *vp);
-    bool checkConnect(VoIPPacket *vp);
-    void closeConnect();
-    void handleVoIPMessage(VoIPPacket *vp);
-    void decodePacket(VoIPPacket *vp);
-    static void initialiseStatics();
+    virtual bool createConnect(VoIPPacket *vp);
+    virtual bool checkConnect(VoIPPacket *vp);
+    virtual void closeConnect();
+    virtual void handleVoIPMessage(VoIPPacket *vp);
+    virtual void decodePacket(VoIPPacket *vp);
+    static void initialiseStatistics();
 
     class Connection
     {
@@ -101,4 +99,4 @@ class VoIPReceiver : public UDPAppBase
     static simsignal_t delaySignal;
 };
 
-#endif // VOIPTOOL_VOIPRECEIVER_H
+#endif // VOIPTOOL_VOIPSINKAPP_H

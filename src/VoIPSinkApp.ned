@@ -21,7 +21,7 @@ package voiptool;
 import inet.applications.udpapp.UDPApp;
 
 
-simple VoIPReceiver like UDPApp
+simple VoIPSinkApp like UDPApp
 {
     parameters:
         int localPort;

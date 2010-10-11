@@ -17,7 +17,7 @@
 //
 
 
-#include "VoIPReceiver.h"
+#include "VoIPSinkApp.h"
 
 #include "INETEndians.h"
 
@@ -25,23 +25,23 @@
 #define INT64_C(x) int64_t(x##ULL)
 // FIXME check on WINDOWS!!
 
-Define_Module(VoIPReceiver);
+Define_Module(VoIPSinkApp);
 
-simsignal_t VoIPReceiver::receivedBytesSignal = SIMSIGNAL_NULL;
-simsignal_t VoIPReceiver::lostSamplesSignal = SIMSIGNAL_NULL;
-simsignal_t VoIPReceiver::lostPacketsSignal = SIMSIGNAL_NULL;
-simsignal_t VoIPReceiver::droppedBytesSignal = SIMSIGNAL_NULL;
-simsignal_t VoIPReceiver::packetHasVoiceSignal = SIMSIGNAL_NULL;
-simsignal_t VoIPReceiver::connStateSignal = SIMSIGNAL_NULL;
-simsignal_t VoIPReceiver::delaySignal = SIMSIGNAL_NULL;
+simsignal_t VoIPSinkApp::receivedBytesSignal = SIMSIGNAL_NULL;
+simsignal_t VoIPSinkApp::lostSamplesSignal = SIMSIGNAL_NULL;
+simsignal_t VoIPSinkApp::lostPacketsSignal = SIMSIGNAL_NULL;
+simsignal_t VoIPSinkApp::droppedBytesSignal = SIMSIGNAL_NULL;
+simsignal_t VoIPSinkApp::packetHasVoiceSignal = SIMSIGNAL_NULL;
+simsignal_t VoIPSinkApp::connStateSignal = SIMSIGNAL_NULL;
+simsignal_t VoIPSinkApp::delaySignal = SIMSIGNAL_NULL;
 
-VoIPReceiver::~VoIPReceiver()
+VoIPSinkApp::~VoIPSinkApp()
 {
     if (timer)
         delete cancelEvent(timer);
 }
 
-void VoIPReceiver::initialiseStatics()
+void VoIPSinkApp::initialiseStatistics()
 {
     if (receivedBytesSignal != SIMSIGNAL_NULL)
         return;
@@ -55,13 +55,13 @@ void VoIPReceiver::initialiseStatics()
     delaySignal = registerSignal("delay");
 }
 
-void VoIPReceiver::initialize()
+void VoIPSinkApp::initialize()
 {
     UDPAppBase::initialize();
-    initialiseStatics();
+    initialiseStatistics();
 
     // Say Hello to the world
-	ev << "VoIPReceiver initialize()" << endl;
+	ev << "VoIPSinkApp initialize()" << endl;
 
 	timer = new cMessage("TIMEOUT");
 
@@ -76,7 +76,7 @@ void VoIPReceiver::initialize()
 	bindToPort(localPort);
 }
 
-void VoIPReceiver::handleMessage(cMessage *msg)
+void VoIPSinkApp::handleMessage(cMessage *msg)
 {
     if (msg->isSelfMessage())
     {
@@ -97,7 +97,7 @@ void VoIPReceiver::handleMessage(cMessage *msg)
 /*
  * add an audio output stream
  */
-void VoIPReceiver::Connection::addAudioStream(enum CodecID codec_id)
+void VoIPSinkApp::Connection::addAudioStream(enum CodecID codec_id)
 {
     AVStream *st = av_new_stream(oc, 1);
     if (!st)
@@ -114,7 +114,7 @@ void VoIPReceiver::Connection::addAudioStream(enum CodecID codec_id)
     audio_st = st;
 }
 
-void VoIPReceiver::Connection::openAudio()
+void VoIPSinkApp::Connection::openAudio()
 {
     AVCodecContext *c;
     AVCodec *avcodec;
@@ -150,7 +150,7 @@ void get_audio_frame(int16_t *samples, int frame_size, int nb_channels)
 */
 }
 
-void VoIPReceiver::Connection::writeLostSamples(int sampleCount)
+void VoIPSinkApp::Connection::writeLostSamples(int sampleCount)
 {
     int pktBytes = sampleCount * sampleBits / 8;
 
@@ -177,7 +177,7 @@ void VoIPReceiver::Connection::writeLostSamples(int sampleCount)
         throw cRuntimeError("Error while writing audio frame\n");
 }
 
-void VoIPReceiver::Connection::writeAudioFrame(uint8_t *inbuf, int inbytes)
+void VoIPSinkApp::Connection::writeAudioFrame(uint8_t *inbuf, int inbytes)
 {
     AVCodecContext *c;
     AVPacket pkt;
@@ -211,7 +211,7 @@ void VoIPReceiver::Connection::writeAudioFrame(uint8_t *inbuf, int inbytes)
     delete[] decBuf;
 }
 
-void VoIPReceiver::Connection::closeAudio()
+void VoIPSinkApp::Connection::closeAudio()
 {
     avcodec_close(audio_st->codec);
 //    av_free(samples);
@@ -219,7 +219,7 @@ void VoIPReceiver::Connection::closeAudio()
 }
 
 
-bool VoIPReceiver::createConnect(VoIPPacket *vp)
+bool VoIPSinkApp::createConnect(VoIPPacket *vp)
 {
     if (!curConn.offline)
         return false;
@@ -300,7 +300,7 @@ bool VoIPReceiver::createConnect(VoIPPacket *vp)
     return true;
 }
 
-bool VoIPReceiver::checkConnect(VoIPPacket *vp)
+bool VoIPSinkApp::checkConnect(VoIPPacket *vp)
 {
     return  (!curConn.offline)
             && vp->getSsrc() == curConn.ssrc
@@ -313,7 +313,7 @@ bool VoIPReceiver::checkConnect(VoIPPacket *vp)
             ;
 }
 
-void VoIPReceiver::closeConnect()
+void VoIPSinkApp::closeConnect()
 {
     if (!curConn.offline)
     {
@@ -351,7 +351,7 @@ void VoIPReceiver::closeConnect()
     }
 }
 
-void VoIPReceiver::handleVoIPMessage(VoIPPacket *vp)
+void VoIPSinkApp::handleVoIPMessage(VoIPPacket *vp)
 {
     long int bytes = (long int)vp->getByteLength();
     bool ok = (curConn.offline) ? createConnect(vp) : checkConnect(vp);
@@ -374,7 +374,7 @@ void VoIPReceiver::handleVoIPMessage(VoIPPacket *vp)
 	delete vp;
 }
 
-void VoIPReceiver::decodePacket(VoIPPacket *vp)
+void VoIPSinkApp::decodePacket(VoIPPacket *vp)
 {
     switch(vp->getType())
     {
@@ -409,7 +409,7 @@ void VoIPReceiver::decodePacket(VoIPPacket *vp)
     curConn.writeAudioFrame(buff, len);
 }
 
-void VoIPReceiver::finish()
+void VoIPSinkApp::finish()
 {
 	ev << "Sink finish()" << endl;
 	closeConnect();
