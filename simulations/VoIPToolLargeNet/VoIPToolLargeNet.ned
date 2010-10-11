@@ -158,8 +158,9 @@ module VoIPToolLargeLAN
 }
 
 //
-// A large Ethernet LAN -- see model description
-// <a href="largenet.html">here</a>.
+// This is a copy of the LargeNet Ethernet demo simulation in the INET Framework,
+// modified to add a VoIP server and a VoIP client. It can be used to test VoIP 
+// transmission on a LAN with high background traffic.
 //
 network VoIPToolLargeNet
 {
