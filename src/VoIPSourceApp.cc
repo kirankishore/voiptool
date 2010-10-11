@@ -16,29 +16,29 @@
 // along with this program; if not, see <http://www.gnu.org/licenses/>.
 //
 
-#include "VoIPGenerator.h"
+#include "VoIPSourceApp.h"
 
-Define_Module(VoIPGenerator);
+Define_Module(VoIPSourceApp);
 
 
-VoIPGenerator::~VoIPGenerator()
+VoIPSourceApp::~VoIPSourceApp()
 {
     if (timer.isScheduled())
         cancelEvent(&timer);
 }
 
-VoIPGenerator::Buffer::Buffer()
+VoIPSourceApp::Buffer::Buffer()
 {
     samples = new char[BUFSIZE];
     clear();
 }
 
-VoIPGenerator::Buffer::~Buffer()
+VoIPSourceApp::Buffer::~Buffer()
 {
     delete[] samples;
 }
 
-void VoIPGenerator::initialize(int stage)
+void VoIPSourceApp::initialize(int stage)
 {
     UDPAppBase::initialize(stage);
 
@@ -46,7 +46,7 @@ void VoIPGenerator::initialize(int stage)
         return;
 
     // say HELLO to the world
-    ev << "VoIPGenerator -> initialize(" << stage << ")" << endl;
+    ev << "VoIPSourceApp -> initialize(" << stage << ")" << endl;
 
     localPort = par("localPort");
     destPort = par("destPort");
@@ -107,7 +107,7 @@ void VoIPGenerator::initialize(int stage)
     pktID = 1;
 }
 
-void VoIPGenerator::handleMessage(cMessage *msg)
+void VoIPSourceApp::handleMessage(cMessage *msg)
 {
     // create an IP message
     VoIPPacket *packet;
@@ -143,12 +143,12 @@ void VoIPGenerator::handleMessage(cMessage *msg)
         delete msg;
 }
 
-void VoIPGenerator::finish()
+void VoIPSourceApp::finish()
 {
 }
 
 
-void VoIPGenerator::openSoundFile(const char *name)
+void VoIPSourceApp::openSoundFile(const char *name)
 {
     int ret = av_open_input_file(&pFormatCtx, name, NULL, 0, NULL);
     if (ret)
@@ -196,7 +196,7 @@ void VoIPGenerator::openSoundFile(const char *name)
         error("could not open %s encoding codec!", codec);
 }
 
-VoIPPacket* VoIPGenerator::generatePacket()
+VoIPPacket* VoIPSourceApp::generatePacket()
 {
     readFrame();
     if (sampleBuffer.empty())
@@ -245,7 +245,7 @@ VoIPPacket* VoIPGenerator::generatePacket()
     return vp;
 }
 
-bool VoIPGenerator::checkSilence(void* _buf, int samples)
+bool VoIPSourceApp::checkSilence(void* _buf, int samples)
 {
     int max = 0;
     int i;
@@ -285,7 +285,7 @@ bool VoIPGenerator::checkSilence(void* _buf, int samples)
     return max < voipSilenceThreshold;
 }
 
-void VoIPGenerator::Buffer::align()
+void VoIPSourceApp::Buffer::align()
 {
     if (readOffset)
         memcpy(samples, samples+readOffset, length());
@@ -293,7 +293,7 @@ void VoIPGenerator::Buffer::align()
     readOffset = 0;
 }
 
-void VoIPGenerator::readFrame()
+void VoIPSourceApp::readFrame()
 {
     if (sampleBuffer.length() >= samplesPerPacket * sampleBytes)
         return;

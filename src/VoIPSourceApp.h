@@ -17,8 +17,8 @@
 //
 
 
-#ifndef VOIPTOOL_VOIPGENERATOR_H
-#define VOIPTOOL_VOIPGENERATOR_H
+#ifndef VOIPTOOL_VOIPSOURCEAPP_H
+#define VOIPTOOL_VOIPSOURCEAPP_H
 
 #include <fnmatch.h>
 #include <vector>
@@ -36,10 +36,10 @@ extern "C" {
 
 //using namespace std;
 
-class INET_API VoIPGenerator : public UDPAppBase
+class INET_API VoIPSourceApp : public UDPAppBase
 {
   public:
-    ~VoIPGenerator();
+    ~VoIPSourceApp();
 
   protected:
     virtual void initialize(int stage);
@@ -47,10 +47,10 @@ class INET_API VoIPGenerator : public UDPAppBase
     virtual void handleMessage(cMessage *msg);
     virtual void finish();
 
-    void openSoundFile(const char *name);
-    VoIPPacket* generatePacket();
-    bool checkSilence(void* _buf, int samples);
-    void readFrame();
+    virtual void openSoundFile(const char *name);
+    virtual VoIPPacket* generatePacket();
+    virtual bool checkSilence(void* _buf, int samples);
+    virtual void readFrame();
 
   protected:
     class Buffer
@@ -106,4 +106,4 @@ class INET_API VoIPGenerator : public UDPAppBase
     cMessage timer;
 };
 
-#endif //VOIPTOOL_VOIPGENERATOR_H
+#endif //VOIPTOOL_VOIPSOURCEAPP_H

@@ -22,7 +22,7 @@ package voiptool;
 import inet.applications.udpapp.UDPApp;
 
 // define the traffic generator
-simple VoIPGenerator like UDPApp
+simple VoIPSourceApp like UDPApp
 {
     // the traffic parameters
     parameters:
