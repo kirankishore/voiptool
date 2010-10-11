@@ -37,8 +37,7 @@ simsignal_t VoIPSinkApp::delaySignal = SIMSIGNAL_NULL;
 
 VoIPSinkApp::~VoIPSinkApp()
 {
-    if (timer)
-        delete cancelEvent(timer);
+    closeConnect();
 }
 
 void VoIPSinkApp::initialiseStatistics()
@@ -63,11 +62,8 @@ void VoIPSinkApp::initialize()
     // Say Hello to the world
 	ev << "VoIPSinkApp initialize()" << endl;
 
-	timer = new cMessage("TIMEOUT");
-
 	//read in omnet parameters
 	localPort = par("localPort");
-	timeout = par("timeout");
 	resultFile = par("resultFile");
 
 	//initialize avcodec library
@@ -78,20 +74,11 @@ void VoIPSinkApp::initialize()
 
 void VoIPSinkApp::handleMessage(cMessage *msg)
 {
-    if (msg->isSelfMessage())
-    {
-        // msg == &timer
-        if (!curConn.offline)
-            closeConnect();
-    }
+    VoIPPacket *vp = dynamic_cast<VoIPPacket *>(msg);
+    if(vp)
+        handleVoIPMessage(vp);
     else
-    {
-        VoIPPacket *vp = dynamic_cast<VoIPPacket *>(msg);
-        if(vp)
-            handleVoIPMessage(vp);
-        else
-            delete msg;
-    }
+        delete msg;
 }
 
 /*
@@ -366,9 +353,6 @@ void VoIPSinkApp::handleVoIPMessage(VoIPPacket *vp)
         return;
     }
 
-    if (timer->isScheduled())
-        cancelEvent(timer);
-    scheduleAt(simTime() + timeout, timer);
     decodePacket(vp);
 
 	delete vp;

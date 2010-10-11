@@ -40,7 +40,7 @@ extern "C" {
 class VoIPSinkApp : public UDPAppBase
 {
   public:
-    VoIPSinkApp() : timer(NULL) {}
+    VoIPSinkApp() { resultFile = ""; }
     ~VoIPSinkApp();
 	
   protected:
@@ -83,13 +83,11 @@ class VoIPSinkApp : public UDPAppBase
 
   protected:
     int localPort;
-    simtime_t timeout;
     simtime_t playOutDelay;
     const char *resultFile;
 
     Connection curConn;
 
-    cMessage *timer;
     static simsignal_t receivedBytesSignal;
     static simsignal_t lostSamplesSignal;
     static simsignal_t lostPacketsSignal;

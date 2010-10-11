@@ -25,7 +25,6 @@ simple VoIPSinkApp like UDPApp
 {
     parameters:
         int localPort;
-        double timeout @unit(s) = default(3s);
         double delay @unit(s) = default(20ms);
         string resultFile;
         @statistic[receivedBytes](title="received bytes";unit=B;record=vector,sum);
