@@ -36,6 +36,7 @@ extern "C" {
 
 #include "VoIPPacket_m.h"
 
+#include "AudioOutFile.h"
 
 class VoIPSinkApp : public UDPAppBase
 {
@@ -73,12 +74,14 @@ class VoIPSinkApp : public UDPAppBase
         short sampleBits;
         int sampleRate;
         int samplesPerPackets;
+        int transmitBitrate;
         simtime_t lastPacketFinish;
         AVFormatContext *oc;
         AVOutputFormat *fmt;
         AVStream *audio_st;
         AVCodecContext *DecCtx;
         AVCodec *pCodecDec;
+        AudioOutFile outFile;
     };
 
   protected:

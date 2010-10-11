@@ -72,6 +72,8 @@ void VoIPSourceApp::initialize(int stage)
     soundFile = par("soundFile").stringValue();
     repeatCount = par("repeatCount");
     traceFileName = par("traceFileName").stringValue();
+    if (traceFileName && *traceFileName)
+        outFile.open(traceFileName, sampleRate, sampleBits);
     simtime_t start = par("start");
 
     samplesPerPacket = (int)round(sampleRate * SIMTIME_DBL(packetTimeLength));
@@ -119,7 +121,7 @@ void VoIPSourceApp::handleMessage(cMessage *msg)
             packet = generatePacket();
             if(!packet)
             {
-                if (repeatCount > 0)
+                if (repeatCount > 1)
                 {
                     repeatCount--;
                     av_seek_frame(pFormatCtx, streamIndex, 0, 0);
@@ -145,6 +147,7 @@ void VoIPSourceApp::handleMessage(cMessage *msg)
 
 void VoIPSourceApp::finish()
 {
+    outFile.close();
 }
 
 
@@ -216,6 +219,7 @@ VoIPPacket* VoIPSourceApp::generatePacket()
     int encSize = avcodec_encode_audio(pEncoderCtx, encoderBuf, encoderBufSize, (short int*)(sampleBuffer.readPtr()));
     if (encSize <= 0)
         error("avcodec_encode_audio() error: %d", encSize);
+    outFile.write(sampleBuffer.readPtr(), samples * sampleBytes);
 
     vp->setDataFromBuffer(encoderBuf, encSize);
 
@@ -238,6 +242,7 @@ VoIPPacket* VoIPSourceApp::generatePacket()
     vp->setSampleRate(sampleRate);
     vp->setSampleBits(sampleBits);
     vp->setSamplesPerPackets(samplesPerPacket);
+    vp->setTransmitBitrate(compressedBitRate);
 
     pktID++;
     sampleBuffer.readOffset += samples * sampleBytes;

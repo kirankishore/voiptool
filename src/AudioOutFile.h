@@ -16,29 +16,38 @@
 // along with this program; if not, see <http://www.gnu.org/licenses/>.
 //
 
-cplusplus {{
-#include "ByteArrayMessage.h"
-}};
 
-class ByteArrayMessage;
+#ifndef VOIPTOOL_AUDIOOUTFILE_H
+#define VOIPTOOL_AUDIOOUTFILE_H
 
-enum VoIPPacketType
+
+#include <omnetpp.h>
+
+extern "C" {
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
+};
+
+
+class AudioOutFile
 {
-    VOICE = 1;
-    SILENT = 2;
-}
+  public:
+    AudioOutFile() : opened(false) {};
+    ~AudioOutFile();
 
-packet VoIPPacket extends ByteArrayMessage
-{
-    int type @enum(VoIPPacketType);
+    bool open(const char *resultFile, int sampleRate, short int sampleBits);
+    bool write(void *inbuf, int inbytes);
+    bool close();
+    bool isopened() { return opened; }
 
-    int codec;
-    short sampleBits;
-    int sampleRate;
-    int transmitBitrate;
-    int samplesPerPackets;
+  protected:
+    void addAudioStream(enum CodecID codec_id, int sampleRate, short int sampleBits);
 
-    uint16_t seqNo;
-    uint32_t timeStamp;
-    uint32_t ssrc;
-}
+  protected:
+    bool opened;
+    AVStream *audio_st;
+    AVFormatContext *oc;
+};
+
+
+#endif // VOIPTOOL_AUDIOOUTFILE_H

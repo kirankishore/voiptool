@@ -81,26 +81,6 @@ void VoIPSinkApp::handleMessage(cMessage *msg)
         delete msg;
 }
 
-/*
- * add an audio output stream
- */
-void VoIPSinkApp::Connection::addAudioStream(enum CodecID codec_id)
-{
-    AVStream *st = av_new_stream(oc, 1);
-    if (!st)
-        throw cRuntimeError("Could not alloc stream\n");
-
-    AVCodecContext *c = st->codec;
-    c->codec_id = codec_id;
-    c->codec_type = CODEC_TYPE_AUDIO;
-
-    /* put sample parameters */
-    c->bit_rate = sampleRate * 16; //FIXME what is valid multiplier?
-    c->sample_rate = sampleRate;
-    c->channels = 1;
-    audio_st = st;
-}
-
 void VoIPSinkApp::Connection::openAudio()
 {
     AVCodecContext *c;
@@ -121,9 +101,10 @@ void VoIPSinkApp::Connection::openAudio()
 
 /* prepare a 16 bit dummy audio frame of 'frame_size' samples and
    'nb_channels' channels */
+/*
 void get_audio_frame(int16_t *samples, int frame_size, int nb_channels)
 {
-/*    int j, i, v;
+    int j, i, v;
     int16_t *q;
 
     q = samples;
@@ -134,75 +115,33 @@ void get_audio_frame(int16_t *samples, int frame_size, int nb_channels)
         t += tincr;
         tincr += tincr2;
     }
-*/
 }
+*/
 
 void VoIPSinkApp::Connection::writeLostSamples(int sampleCount)
 {
     int pktBytes = sampleCount * sampleBits / 8;
-
-    AVCodecContext *c;
-    c = audio_st->codec;
-    uint8_t outbuf[pktBytes];
     uint8_t decBuf[pktBytes];
     memset(decBuf, 0, pktBytes);
-    AVPacket pkt;
-
-    av_init_packet(&pkt);
-
-    // the 3rd parameter of avcodec_encode_audio() is the size of INPUT buffer!!!
-    // It's wrong in the FFMPEG documentation/header file!!!
-    pkt.size = avcodec_encode_audio(c, outbuf, pktBytes, (short int*)decBuf);
-    if (c->coded_frame->pts != AV_NOPTS_VALUE)
-        pkt.pts= av_rescale_q(c->coded_frame->pts, c->time_base, audio_st->time_base);
-    pkt.flags |= PKT_FLAG_KEY;
-    pkt.stream_index= audio_st->index;
-    pkt.data = outbuf;
-
-    // write the compressed frame in the media file
-    if (av_interleaved_write_frame(oc, &pkt) != 0)
-        throw cRuntimeError("Error while writing audio frame\n");
+    outFile.write(decBuf, pktBytes);
 }
 
 void VoIPSinkApp::Connection::writeAudioFrame(uint8_t *inbuf, int inbytes)
 {
-    AVCodecContext *c;
-    AVPacket pkt;
-    av_init_packet(&pkt);
-
-    int decBufSize = AVCODEC_MAX_AUDIO_FRAME_SIZE;
+   int decBufSize = AVCODEC_MAX_AUDIO_FRAME_SIZE;
     int16_t *decBuf = new int16_t[decBufSize]; // output is 16bit
     int ret = avcodec_decode_audio2(DecCtx, decBuf, &decBufSize, inbuf, inbytes);
     if (ret < 0)
         throw cRuntimeError("avcodec_decode_audio2(): received packet decoding error: %d", ret);
 
-    c = audio_st->codec;
-
     lastPacketFinish += simtime_t(1.0) * (decBufSize * 8 / sampleBits) / sampleRate;
-//    get_audio_frame(inbuf, audio_input_frame_size, c->channels);
-
-    int outbufSize = decBufSize;
-    uint8_t outbuf[outbufSize];
-    // the 3rd parameter of avcodec_encode_audio() is the size of INPUT buffer!!!
-    // It's wrong in the FFMPEG documentation/header file!!!
-    pkt.size = avcodec_encode_audio(c, outbuf, outbufSize, decBuf);
-    if (c->coded_frame->pts != AV_NOPTS_VALUE)
-        pkt.pts= av_rescale_q(c->coded_frame->pts, c->time_base, audio_st->time_base);
-    pkt.flags |= PKT_FLAG_KEY;
-    pkt.stream_index= audio_st->index;
-    pkt.data = outbuf;
-
-    // write the compressed frame in the media file
-    if (av_interleaved_write_frame(oc, &pkt) != 0)
-        throw cRuntimeError("Error while writing audio frame\n");
+    outFile.write(decBuf, decBufSize);
     delete[] decBuf;
 }
 
 void VoIPSinkApp::Connection::closeAudio()
 {
-    avcodec_close(audio_st->codec);
-//    av_free(samples);
-//    av_free(audio_outbuf);
+    outFile.close();
 }
 
 
@@ -220,13 +159,13 @@ bool VoIPSinkApp::createConnect(VoIPPacket *vp)
     curConn.codec = (enum CodecID)(vp->getCodec());
     curConn.sampleBits = vp->getSampleBits();
     curConn.sampleRate = vp->getSampleRate();
+    curConn.transmitBitrate = vp->getTransmitBitrate();
     curConn.samplesPerPackets = vp->getSamplesPerPackets();
     curConn.lastPacketFinish = simTime() + playOutDelay;
 
     curConn.DecCtx = avcodec_alloc_context();
 
-    curConn.DecCtx->bit_rate = curConn.sampleBits;
-    curConn.DecCtx->bit_rate = 40000;
+    curConn.DecCtx->bit_rate = curConn.transmitBitrate;
     curConn.DecCtx->sample_rate = curConn.sampleRate;
     curConn.DecCtx->channels = 1;
 
@@ -237,54 +176,7 @@ bool VoIPSinkApp::createConnect(VoIPPacket *vp)
     if (ret < 0)
         error("could not open decoding codec!");
 
-    AVOutputFormat *fmt;
-    // auto detect the output format from the name. default is WAV
-    fmt = guess_format(NULL, resultFile, NULL);
-    if (!fmt)
-    {
-        ev << "Could not deduce output format from file extension: using WAV.\n";
-        fmt = guess_format("wav", NULL, NULL);
-    }
-    if (!fmt)
-    {
-        error("Could not find suitable output format fro filename '%s'\n", resultFile);
-    }
-
-    // allocate the output media context
-    curConn.oc = avformat_alloc_context();
-    if (!curConn.oc)
-        error("Memory error at avformat_alloc_context()\n");
-
-    curConn.oc->oformat = fmt;
-    snprintf(curConn.oc->filename, sizeof(curConn.oc->filename), "%s", resultFile);
-
-    // add the audio stream using the default format codecs and initialize the codecs
-    curConn.audio_st = NULL;
-    if (fmt->audio_codec != CODEC_ID_NONE)
-        curConn.addAudioStream(fmt->audio_codec);
-
-    // set the output parameters (must be done even if no parameters).
-    if (av_set_parameters(curConn.oc, NULL) < 0)
-        error("Invalid output format parameters\n");
-
-    dump_format(curConn.oc, 0, resultFile, 1);
-
-    /* now that all the parameters are set, we can open the audio and
-       video codecs and allocate the necessary encode buffers */
-    if (curConn.audio_st)
-        curConn.openAudio();
-
-    /* open the output file, if needed */
-    if (!(fmt->flags & AVFMT_NOFILE))
-    {
-        if (url_fopen(&curConn.oc->pb, resultFile, URL_WRONLY) < 0)
-            error("Could not open '%s'\n", resultFile);
-    }
-
-    // write the stream header
-    av_write_header(curConn.oc);
-
-    return true;
+    return curConn.outFile.open(resultFile, curConn.sampleRate, curConn.sampleBits);
 }
 
 bool VoIPSinkApp::checkConnect(VoIPPacket *vp)
@@ -295,6 +187,7 @@ bool VoIPSinkApp::checkConnect(VoIPPacket *vp)
             && vp->getSampleBits() == curConn.sampleBits
             && vp->getSampleRate() == curConn.sampleRate
             && vp->getSamplesPerPackets() == curConn.samplesPerPackets
+            && vp->getTransmitBitrate() == curConn.transmitBitrate
             && vp->getSeqNo() > curConn.seqNo
             && vp->getTimeStamp() > curConn.timeStamp
             ;
@@ -304,37 +197,11 @@ void VoIPSinkApp::closeConnect()
 {
     if (!curConn.offline)
     {
+        curConn.offline = true;
         avcodec_close(curConn.DecCtx);
         //FIXME implementation: delete buffers, close output file if need
+        curConn.outFile.close();
         emit(connStateSignal, 0);
-        curConn.offline = true;
-
-        /* write the trailer, if any.  the trailer must be written
-         * before you close the CodecContexts open when you wrote the
-         * header; otherwise write_trailer may try to use memory that
-         * was freed on av_codec_close() */
-        av_write_trailer(curConn.oc);
-
-        /* close each codec */
-        if (curConn.audio_st)
-            curConn.closeAudio();
-
-        /* free the streams */
-        for(unsigned int i = 0; i < curConn.oc->nb_streams; i++)
-        {
-            av_freep(&curConn.oc->streams[i]->codec);
-            av_freep(&curConn.oc->streams[i]);
-        }
-
-        if (!(curConn.oc->oformat->flags & AVFMT_NOFILE))
-        {
-            /* close the output file */
-            url_fclose(curConn.oc->pb);
-        }
-
-        /* free the stream */
-        av_free(curConn.oc);
-        av_free(curConn.DecCtx);
     }
 }
 
@@ -342,18 +209,10 @@ void VoIPSinkApp::handleVoIPMessage(VoIPPacket *vp)
 {
     long int bytes = (long int)vp->getByteLength();
     bool ok = (curConn.offline) ? createConnect(vp) : checkConnect(vp);
-    if(ok)
-    {
-        emit(receivedBytesSignal, bytes);
-    }
-    else
-    {
-        emit(droppedBytesSignal, bytes);
-        delete vp;
-        return;
-    }
+    emit(ok ? receivedBytesSignal : droppedBytesSignal, bytes);
 
-    decodePacket(vp);
+    if (ok)
+        decodePacket(vp);
 
 	delete vp;
 }

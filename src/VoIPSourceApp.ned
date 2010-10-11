@@ -38,9 +38,7 @@ simple VoIPSourceApp like UDPApp
         string codec = default("g726");	// used by ffmpeg::avcodec_find_encoder_by_name()
         int compressedBitRate @unit(bps) = default(40Kbps);
         double packetTimeLength @unit(s) = default(20ms);
-
         string soundFile;	// filename of input audiofile
-
         int repeatCount = default(1);
         string traceFileName = default(""); // filename to save output stream, OFF when empty
 

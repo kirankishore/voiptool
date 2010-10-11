@@ -29,6 +29,7 @@ extern "C" {
 #include <libavformat/avformat.h>
 };
 
+#include "AudioOutFile.h"
 #include "IPAddressResolver.h"
 #include "UDPAppBase.h"
 #include "UDPControlInfo_m.h"
@@ -71,6 +72,7 @@ class INET_API VoIPSourceApp : public UDPAppBase
         int availableSpace() const {return BUFSIZE - writeOffset; }
         void align();
     };
+    AudioOutFile outFile;
     int localPort;
     int destPort;
     IPvXAddress destAddress;
