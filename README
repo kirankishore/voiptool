@@ -16,12 +16,12 @@ Moreover, by applying ITU-T's perceptual evaluation of speech quality
 stream can be determined.
 
 This library is an add-on to the INET Framework, http://inet.omnetpp.org.
-It provides two modules: VoIPGenerator and VoIPReceiver. Both are
+It provides two modules: VoIPSourceApp and VoIPSinkApp. Both are
 application- layer modules that operate over UDP, and can be used in INET's
 StandardHost very much like other UDP traffic generators and sinks (see the
 udpApp[] submodule vector, numUdpApps parameter, etc. in StandardHost.)
 
-VoIPGenerator accepts an audio file and a destination IP address/port as
+VoIPSourceApp accepts an audio file and a destination IP address/port as
 input, and will transmit the file's contents as voice traffic over UDP n
 times (by default once). For transmission, the audio is resampled at the
 given frequency (by default 8KHz) and depth (by default 16 bits), and
@@ -34,7 +34,7 @@ special "silence" packets. The module does not simulate any particular VoIP
 protocol (e.g. RTP), but instead accepts a "header size" parameter that
 can be set accordingly.
 
-VoIPReceiver listens on an UDP port, and expects to receive VoIP packets on
+VoIPSinkApp listens on an UDP port, and expects to receive VoIP packets on
 it. The received voice is then saved into a result audio file that can be
 compared with the original for further evaluation. VoIP packets are
 numbered, and out-of-order packets are discarded (the corresponding voice
