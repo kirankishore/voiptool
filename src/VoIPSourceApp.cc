@@ -106,9 +106,8 @@ void VoIPSourceApp::initialize(int stage)
     av_init_packet(&packet);
 
     openSoundFile(soundFile);
-    //////////////////////////////////////////////////////////////////////////////////
+
     scheduleAt(start, &timer);
-    //////////////////////////////////////////////////////////////////////////////////
 
     voipSilenceSize = voipHeaderSize;
 
@@ -359,7 +358,6 @@ void VoIPSourceApp::readFrame()
             continue;
 
         // packet length == 0 ? read next packet
-//        if (packet.duration == 0)
         if (packet.size == 0)
             continue;
 
