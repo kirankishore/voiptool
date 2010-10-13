@@ -58,18 +58,22 @@ class INET_API VoIPSourceApp : public UDPAppBase
     {
       public:
         enum { BUFSIZE = AVCODEC_MAX_AUDIO_FRAME_SIZE };
+      protected:
         char *samples;
+        int bufferSize;
         int readOffset;
         int writeOffset;
       public:
         Buffer();
         ~Buffer();
-        void clear() { readOffset = 0; writeOffset = 0; }
-        int length() const {return writeOffset-readOffset; }
+        void clear(int framesize);
+        int length() const {return writeOffset - readOffset; }
         bool empty() const {return writeOffset <= readOffset; }
         char* readPtr() { return samples + readOffset; }
         char* writePtr() { return samples + writeOffset; }
-        int availableSpace() const {return BUFSIZE - writeOffset; }
+        int availableSpace() const {return bufferSize - writeOffset; }
+        void notifyRead(int length) { readOffset += length; ASSERT(readOffset <= writeOffset); }
+        void notifyWrote(int length) { writeOffset += length; ASSERT(writeOffset <= bufferSize); }
         void align();
     };
     AudioOutFile outFile;
@@ -80,8 +84,8 @@ class INET_API VoIPSourceApp : public UDPAppBase
     int voipHeaderSize;
     int voipSilenceThreshold;       // the maximum amplitude of a silence packet
     int sampleRate;                 // samples/sec [Hz]
-    short int sampleBits;           // bits/sample (8,16,32)  // the 24 is not supported by ffmpeg
-    short int sampleBytes;          // bytes/sample (1,2,4)  // the 3 is not supported by ffmpeg
+    short int bitsPerSample;           // bits/sample (8,16,32)  // the 24 is not supported by ffmpeg
+    short int bytesPerSample;          // bytes/sample (1,2,4)  // the 3 is not supported by ffmpeg
     const char *codec;
     int compressedBitRate;
     simtime_t packetTimeLength;
@@ -104,6 +108,7 @@ class INET_API VoIPSourceApp : public UDPAppBase
     bool writeTracesToDisk;         // bool value - parameter if VoIP tracefiles should be written to disk
     int samplesPerPacket;
     Buffer sampleBuffer;
+    AVPacket packet;
 
     cMessage timer;
 };

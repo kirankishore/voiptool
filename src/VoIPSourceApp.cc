@@ -27,15 +27,26 @@ VoIPSourceApp::~VoIPSourceApp()
         cancelEvent(&timer);
 }
 
-VoIPSourceApp::Buffer::Buffer()
+VoIPSourceApp::Buffer::Buffer() :
+    samples(NULL),
+    bufferSize(0),
+    readOffset(0),
+    writeOffset(0)
 {
-    samples = new char[BUFSIZE];
-    clear();
 }
 
 VoIPSourceApp::Buffer::~Buffer()
 {
     delete[] samples;
+}
+
+void VoIPSourceApp::Buffer::clear(int framesize)
+{
+    delete samples;
+    bufferSize = BUFSIZE + framesize;
+    samples = new char[bufferSize];
+    readOffset = 0;
+    writeOffset = 0;
 }
 
 void VoIPSourceApp::initialize(int stage)
@@ -55,16 +66,16 @@ void VoIPSourceApp::initialize(int stage)
     voipHeaderSize = par("voipHeaderSize");
     voipSilenceThreshold = par("voipSilenceThreshold");
     sampleRate = par("sampleRate");
-    sampleBits = par("sampleBits");
-    switch(sampleBits)
+    bitsPerSample = par("bitsPerSample");
+    switch(bitsPerSample)
     {
         case  8: sampleFormat = SAMPLE_FMT_U8;  break;
         case 16: sampleFormat = SAMPLE_FMT_S16; break;
         case 32: sampleFormat = SAMPLE_FMT_S32; break;
         default:
-            error("Invalid sampleBits=%d parameter, valid values only 8, 16 or 32", sampleBits);
+            error("Invalid bitsPerSample=%d parameter, valid values only 8, 16 or 32", bitsPerSample);
     }
-    sampleBytes = sampleBits/8;
+    bytesPerSample = bitsPerSample/8;
     codec = par("codec").stringValue();
     compressedBitRate = par("compressedBitRate");
     packetTimeLength = par("packetTimeLength");
@@ -73,22 +84,26 @@ void VoIPSourceApp::initialize(int stage)
     repeatCount = par("repeatCount");
     traceFileName = par("traceFileName").stringValue();
     if (traceFileName && *traceFileName)
-        outFile.open(traceFileName, sampleRate, sampleBits);
+        outFile.open(traceFileName, sampleRate, bitsPerSample);
     simtime_t start = par("start");
 
     samplesPerPacket = (int)round(sampleRate * SIMTIME_DBL(packetTimeLength));
-    int bytesPerPacket = samplesPerPacket * sampleBytes;
+    int bytesPerPacket = samplesPerPacket * bytesPerSample;
     if (bytesPerPacket & 1)
+    {
         samplesPerPacket++;
-
+        bytesPerPacket = samplesPerPacket * bytesPerSample;
+    }
     ev << "The packetTimeLength parameter is " << packetTimeLength * 1000.0 << "ms, ";
     packetTimeLength = ((double)samplesPerPacket) / sampleRate;
     ev << "recalculated to " << packetTimeLength * 1000.0 << "ms!" << endl;
 
-    sampleBuffer.clear();
+    sampleBuffer.clear(bytesPerPacket);
 
     // initialize avcodec library
     av_register_all();
+
+    av_init_packet(&packet);
 
     openSoundFile(soundFile);
     //////////////////////////////////////////////////////////////////////////////////
@@ -97,13 +112,13 @@ void VoIPSourceApp::initialize(int stage)
 
     voipSilenceSize = voipHeaderSize;
 
-    switch(sampleBits)
+    switch(bitsPerSample)
     {
         case  8: sampleFormat = SAMPLE_FMT_U8;  break;
         case 16: sampleFormat = SAMPLE_FMT_S16; break;
         case 32: sampleFormat = SAMPLE_FMT_S32; break;
         default:
-            error("Invalid 'sampleBits='%d parameter", sampleBits);
+            error("Invalid 'bitsPerSample='%d parameter", bitsPerSample);
     }
     // initialize the sequence number
     pktID = 1;
@@ -147,7 +162,14 @@ void VoIPSourceApp::handleMessage(cMessage *msg)
 
 void VoIPSourceApp::finish()
 {
+    av_free_packet(&packet);
     outFile.close();
+    if (this->pReSampleCtx)
+        audio_resample_close(pReSampleCtx);
+    pReSampleCtx = NULL;
+
+    if (this->pFormatCtx)
+        av_close_input_file(pFormatCtx);
 }
 
 
@@ -171,8 +193,10 @@ void VoIPSourceApp::openSoundFile(const char *name)
     pCodecCtx = pFormatCtx->streams[streamIndex]->codec;
 
     //find decoder and open the correct codec
-    pCodec=avcodec_find_decoder(pCodecCtx->codec_id);
-    avcodec_open(pCodecCtx, pCodec);
+    pCodec = avcodec_find_decoder(pCodecCtx->codec_id);
+    ret = avcodec_open(pCodecCtx, pCodec);
+    if (ret)
+        error("avcodec_open() error on file '%s': %d", name, ret);
     if(pCodecCtx->sample_rate != sampleRate || pCodecCtx->channels != 1)
     {
         pReSampleCtx = av_audio_resample_init(1, pCodecCtx->channels, sampleRate, pCodecCtx->sample_rate,
@@ -205,7 +229,7 @@ VoIPPacket* VoIPSourceApp::generatePacket()
     if (sampleBuffer.empty())
         return NULL;
 
-    int samples = std::min(sampleBuffer.length()/sampleBytes, samplesPerPacket);
+    int samples = std::min(sampleBuffer.length()/bytesPerSample, samplesPerPacket);
     bool isSilent = checkSilence(sampleBuffer.readPtr(), samples);
     VoIPPacket *vp = new VoIPPacket();
     int encoderBufSize = (int)(compressedBitRate * SIMTIME_DBL(packetTimeLength))/8+256;
@@ -219,7 +243,7 @@ VoIPPacket* VoIPSourceApp::generatePacket()
     int encSize = avcodec_encode_audio(pEncoderCtx, encoderBuf, encoderBufSize, (short int*)(sampleBuffer.readPtr()));
     if (encSize <= 0)
         error("avcodec_encode_audio() error: %d", encSize);
-    outFile.write(sampleBuffer.readPtr(), samples * sampleBytes);
+    outFile.write(sampleBuffer.readPtr(), samples * bytesPerSample);
 
     vp->setDataFromBuffer(encoderBuf, encSize);
 
@@ -240,12 +264,12 @@ VoIPPacket* VoIPSourceApp::generatePacket()
     vp->setSeqNo(pktID);
     vp->setCodec(pEncoderCtx->codec_id);
     vp->setSampleRate(sampleRate);
-    vp->setSampleBits(sampleBits);
+    vp->setSampleBits(bitsPerSample);
     vp->setSamplesPerPackets(samplesPerPacket);
     vp->setTransmitBitrate(compressedBitRate);
 
     pktID++;
-    sampleBuffer.readOffset += samples * sampleBytes;
+    sampleBuffer.notifyRead(samples * bytesPerSample);
 
     return vp;
 }
@@ -261,8 +285,11 @@ bool VoIPSourceApp::checkSilence(void* _buf, int samples)
         {
             uint8_t *buf = (uint8_t *)_buf;
             for (i=0; i<samples; ++i)
-                if (abs(buf[i]) > max)
-                    max = abs(buf[i]);
+            {
+                int s = abs(int(buf[i]) - 0x80);
+                if (s > max)
+                    max = s;
+            }
         }
         break;
 
@@ -270,8 +297,11 @@ bool VoIPSourceApp::checkSilence(void* _buf, int samples)
         {
             int16_t *buf = (int16_t *)_buf;
             for (i=0; i<samples; ++i)
-                if (abs(buf[i]) > max)
-                    max = abs(buf[i]);
+            {
+                int s = abs(buf[i]);
+                if (s > max)
+                    max = s;
+            }
         }
         break;
 
@@ -279,8 +309,11 @@ bool VoIPSourceApp::checkSilence(void* _buf, int samples)
         {
             int32_t *buf = (int32_t *)_buf;
             for (i=0; i<samples; ++i)
-                if (abs(buf[i]) > max)
-                    max = abs(buf[i]);
+            {
+                int s = abs(buf[i]);
+                if (s > max)
+                    max = s;
+            }
         }
         break;
 
@@ -293,25 +326,27 @@ bool VoIPSourceApp::checkSilence(void* _buf, int samples)
 void VoIPSourceApp::Buffer::align()
 {
     if (readOffset)
-        memcpy(samples, samples+readOffset, length());
-    writeOffset -= readOffset;
-    readOffset = 0;
+    {
+        if (length())
+            memcpy(samples, samples+readOffset, length());
+        writeOffset -= readOffset;
+        readOffset = 0;
+    }
 }
 
 void VoIPSourceApp::readFrame()
 {
-    if (sampleBuffer.length() >= samplesPerPacket * sampleBytes)
+    if (sampleBuffer.length() >= samplesPerPacket * bytesPerSample)
         return;
 
     sampleBuffer.align();
 
-    AVPacket packet;
-
     char *tmpSamples = NULL;
     if(pReSampleCtx)
+    {
         tmpSamples = new char[Buffer::BUFSIZE];
-
-    while(sampleBuffer.length() < samplesPerPacket * sampleBytes)
+    }
+    while(sampleBuffer.length() < samplesPerPacket * bytesPerSample)
     {
         //read one frame
         int err = av_read_frame(pFormatCtx, &packet);
@@ -324,32 +359,40 @@ void VoIPSourceApp::readFrame()
             continue;
 
         // packet length == 0 ? read next packet
-        if (packet.duration == 0)
+//        if (packet.duration == 0)
+        if (packet.size == 0)
             continue;
 
-        // decode audio and save the decoded samples in our buffer
-        int16_t *rbuf, *nbuf;
-        nbuf = (int16_t*)(sampleBuffer.writePtr());
-        rbuf = (pReSampleCtx) ? (int16_t*)tmpSamples : nbuf;
+        uint8_t *ptr = packet.data;
+        int len = packet.size;
 
-        int frame_size = AVCODEC_MAX_AUDIO_FRAME_SIZE;
-        int decoded = avcodec_decode_audio2(pCodecCtx, rbuf, &frame_size, packet.data, packet.size);
-        if (decoded < 0)
-            error("Error decoding frame, err=%d", decoded);
-
-        if (frame_size == 0)
-            continue;
-
-        if (decoded != packet.size)
-            error("Error decoding frame, not decoded the all samples of the frame (%d < %d)", decoded, packet.size);
-
-        decoded = frame_size / sampleBytes / pCodecCtx->channels;
-        if (pReSampleCtx)
+        while (len > 0)
         {
-            decoded = audio_resample(pReSampleCtx, nbuf, rbuf, decoded);
+            // decode audio and save the decoded samples in our buffer
+            int16_t *rbuf, *nbuf;
+            nbuf = (int16_t*)(sampleBuffer.writePtr());
+            rbuf = (pReSampleCtx) ? (int16_t*)tmpSamples : nbuf;
+
+            int frame_size = (pReSampleCtx) ? Buffer::BUFSIZE : sampleBuffer.availableSpace();
+            memset(rbuf, 0, frame_size);
+            int decoded = avcodec_decode_audio2(pCodecCtx, rbuf, &frame_size, ptr, len);
+            if (decoded < 0)
+                error("Error decoding frame, err=%d", decoded);
+
+            ptr += decoded;
+            len -= decoded;
+
+            if (frame_size == 0)
+                continue;
+
+            decoded = frame_size / (bytesPerSample * pCodecCtx->channels);
+            ASSERT(frame_size == decoded * bytesPerSample * pCodecCtx->channels);
+            if (pReSampleCtx)
+            {
+                decoded = audio_resample(pReSampleCtx, nbuf, rbuf, decoded);
+            }
+            sampleBuffer.notifyWrote(decoded * bytesPerSample);
         }
-        sampleBuffer.writeOffset += decoded * sampleBytes;
-        av_free_packet(&packet);
     }
     if(pReSampleCtx)
         delete[] tmpSamples;

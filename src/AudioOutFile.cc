@@ -115,7 +115,7 @@ bool AudioOutFile::write(void *decBuf, int pktBytes)
         return false;
 
     AVCodecContext *c = audio_st->codec;
-    uint8_t outbuf[pktBytes];
+    uint8_t outbuf[pktBytes + FF_MIN_BUFFER_SIZE];
     AVPacket pkt;
 
     av_init_packet(&pkt);

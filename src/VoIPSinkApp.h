@@ -61,7 +61,7 @@ class VoIPSinkApp : public UDPAppBase
       public:
         Connection() : offline(true) {}
         void addAudioStream(enum CodecID codec_id);
-        void openAudio();
+        bool openAudio(const char *fileName);
         void writeAudioFrame(uint8_t *buf, int len);
         void writeLostSamples(int sampleCount);
         void closeAudio();

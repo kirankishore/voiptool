@@ -81,42 +81,25 @@ void VoIPSinkApp::handleMessage(cMessage *msg)
         delete msg;
 }
 
-void VoIPSinkApp::Connection::openAudio()
+bool VoIPSinkApp::Connection::openAudio(const char *fileName)
 {
+/*
     AVCodecContext *c;
     AVCodec *avcodec;
 
     c = audio_st->codec;
 
-    /* find the audio encoder */
+    // find the audio encoder
     avcodec = avcodec_find_encoder(c->codec_id);
     if (!avcodec)
         throw cRuntimeError("codec %d not found\n", c->codec_id);
 
-    /* open it */
+    // open it
     if (avcodec_open(c, avcodec) < 0)
         throw cRuntimeError("could not open codec %d\n", c->codec_id);
-
-}
-
-/* prepare a 16 bit dummy audio frame of 'frame_size' samples and
-   'nb_channels' channels */
-/*
-void get_audio_frame(int16_t *samples, int frame_size, int nb_channels)
-{
-    int j, i, v;
-    int16_t *q;
-
-    q = samples;
-    for(j=0;j<frame_size;j++) {
-        v = (int)(sin(t) * 10000);
-        for(i = 0; i < nb_channels; i++)
-            *q++ = v;
-        t += tincr;
-        tincr += tincr2;
-    }
-}
 */
+    return outFile.open(fileName, sampleRate, sampleBits);
+}
 
 void VoIPSinkApp::Connection::writeLostSamples(int sampleCount)
 {
@@ -176,7 +159,7 @@ bool VoIPSinkApp::createConnect(VoIPPacket *vp)
     if (ret < 0)
         error("could not open decoding codec!");
 
-    return curConn.outFile.open(resultFile, curConn.sampleRate, curConn.sampleBits);
+    return curConn.openAudio(resultFile);
 }
 
 bool VoIPSinkApp::checkConnect(VoIPPacket *vp)
@@ -199,7 +182,6 @@ void VoIPSinkApp::closeConnect()
     {
         curConn.offline = true;
         avcodec_close(curConn.DecCtx);
-        //FIXME implementation: delete buffers, close output file if need
         curConn.outFile.close();
         emit(connStateSignal, 0);
     }
