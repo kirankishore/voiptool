@@ -50,7 +50,7 @@ class INET_API VoIPSourceApp : public UDPAppBase
 
     virtual void openSoundFile(const char *name);
     virtual VoIPPacket* generatePacket();
-    virtual bool checkSilence(void* _buf, int samples);
+    virtual bool checkSilence(enum SampleFormat sampleFormat, void* _buf, int samples);
     virtual void readFrame();
 
   protected:
@@ -84,8 +84,6 @@ class INET_API VoIPSourceApp : public UDPAppBase
     int voipHeaderSize;
     int voipSilenceThreshold;       // the maximum amplitude of a silence packet
     int sampleRate;                 // samples/sec [Hz]
-    short int bitsPerSample;           // bits/sample (8,16,32)  // the 24 is not supported by ffmpeg
-    short int bytesPerSample;          // bytes/sample (1,2,4)  // the 3 is not supported by ffmpeg
     const char *codec;
     int compressedBitRate;
     simtime_t packetTimeLength;
@@ -96,7 +94,6 @@ class INET_API VoIPSourceApp : public UDPAppBase
     int voipSilenceSize;            // size of a silence packet
     int noWavFiles;                 // number of VoIP wav files available
 
-    enum SampleFormat sampleFormat; // ffmpeg: enum SampleFormat
     AVFormatContext *pFormatCtx;
     AVCodecContext *pCodecCtx;
     AVCodec *pCodec;                // input decoder codec

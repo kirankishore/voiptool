@@ -98,12 +98,12 @@ bool VoIPSinkApp::Connection::openAudio(const char *fileName)
     if (avcodec_open(c, avcodec) < 0)
         throw cRuntimeError("could not open codec %d\n", c->codec_id);
 */
-    return outFile.open(fileName, sampleRate, sampleBits);
+    return outFile.open(fileName, sampleRate, av_get_bits_per_sample_format(decCtx->sample_fmt));
 }
 
 void VoIPSinkApp::Connection::writeLostSamples(int sampleCount)
 {
-    int pktBytes = sampleCount * sampleBits / 8;
+    int pktBytes = sampleCount * av_get_bits_per_sample_format(decCtx->sample_fmt) / 8;
     uint8_t decBuf[pktBytes];
     memset(decBuf, 0, pktBytes);
     outFile.write(decBuf, pktBytes);
@@ -113,11 +113,11 @@ void VoIPSinkApp::Connection::writeAudioFrame(uint8_t *inbuf, int inbytes)
 {
    int decBufSize = AVCODEC_MAX_AUDIO_FRAME_SIZE;
     int16_t *decBuf = new int16_t[decBufSize]; // output is 16bit
-    int ret = avcodec_decode_audio2(DecCtx, decBuf, &decBufSize, inbuf, inbytes);
+    int ret = avcodec_decode_audio2(decCtx, decBuf, &decBufSize, inbuf, inbytes);
     if (ret < 0)
         throw cRuntimeError("avcodec_decode_audio2(): received packet decoding error: %d", ret);
 
-    lastPacketFinish += simtime_t(1.0) * (decBufSize * 8 / sampleBits) / sampleRate;
+    lastPacketFinish += simtime_t(1.0) * (decBufSize * 8 / av_get_bits_per_sample_format(decCtx->sample_fmt)) / sampleRate;
     outFile.write(decBuf, decBufSize);
     delete[] decBuf;
 }
@@ -146,16 +146,16 @@ bool VoIPSinkApp::createConnect(VoIPPacket *vp)
     curConn.samplesPerPacket = vp->getSamplesPerPacket();
     curConn.lastPacketFinish = simTime() + playOutDelay;
 
-    curConn.DecCtx = avcodec_alloc_context();
+    curConn.decCtx = avcodec_alloc_context();
 
-    curConn.DecCtx->bit_rate = curConn.transmitBitrate;
-    curConn.DecCtx->sample_rate = curConn.sampleRate;
-    curConn.DecCtx->channels = 1;
+    curConn.decCtx->bit_rate = curConn.transmitBitrate;
+    curConn.decCtx->sample_rate = curConn.sampleRate;
+    curConn.decCtx->channels = 1;
 
     curConn.pCodecDec = avcodec_find_decoder(curConn.codec);
     if (curConn.pCodecDec == NULL)
         error("Codec %d not found!", curConn.codec);
-    int ret = avcodec_open(curConn.DecCtx, curConn.pCodecDec);
+    int ret = avcodec_open(curConn.decCtx, curConn.pCodecDec);
     if (ret < 0)
         error("could not open decoding codec!");
 
@@ -181,7 +181,7 @@ void VoIPSinkApp::closeConnection()
     if (!curConn.offline)
     {
         curConn.offline = true;
-        avcodec_close(curConn.DecCtx);
+        avcodec_close(curConn.decCtx);
         curConn.outFile.close();
         emit(connStateSignal, 0);
     }

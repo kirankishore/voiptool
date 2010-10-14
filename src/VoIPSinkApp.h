@@ -79,7 +79,7 @@ class VoIPSinkApp : public UDPAppBase
         AVFormatContext *oc;
         AVOutputFormat *fmt;
         AVStream *audio_st;
-        AVCodecContext *DecCtx;
+        AVCodecContext *decCtx;
         AVCodec *pCodecDec;
         AudioOutFile outFile;
     };
