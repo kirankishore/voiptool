@@ -37,10 +37,10 @@ simsignal_t VoIPSinkApp::delaySignal = SIMSIGNAL_NULL;
 
 VoIPSinkApp::~VoIPSinkApp()
 {
-    closeConnect();
+    closeConnection();
 }
 
-void VoIPSinkApp::initialiseStatistics()
+void VoIPSinkApp::initSignals()
 {
     if (receivedBytesSignal != SIMSIGNAL_NULL)
         return;
@@ -57,19 +57,19 @@ void VoIPSinkApp::initialiseStatistics()
 void VoIPSinkApp::initialize()
 {
     UDPAppBase::initialize();
-    initialiseStatistics();
+    initSignals();
 
     // Say Hello to the world
-	ev << "VoIPSinkApp initialize()" << endl;
+    ev << "VoIPSinkApp initialize()" << endl;
 
-	//read in omnet parameters
-	localPort = par("localPort");
-	resultFile = par("resultFile");
+    //read in omnet parameters
+    localPort = par("localPort");
+    resultFile = par("resultFile");
 
-	//initialize avcodec library
-	av_register_all();
+    //initialize avcodec library
+    av_register_all();
 
-	bindToPort(localPort);
+    bindToPort(localPort);
 }
 
 void VoIPSinkApp::handleMessage(cMessage *msg)
@@ -143,7 +143,7 @@ bool VoIPSinkApp::createConnect(VoIPPacket *vp)
     curConn.sampleBits = vp->getSampleBits();
     curConn.sampleRate = vp->getSampleRate();
     curConn.transmitBitrate = vp->getTransmitBitrate();
-    curConn.samplesPerPackets = vp->getSamplesPerPackets();
+    curConn.samplesPerPacket = vp->getSamplesPerPacket();
     curConn.lastPacketFinish = simTime() + playOutDelay;
 
     curConn.DecCtx = avcodec_alloc_context();
@@ -169,14 +169,14 @@ bool VoIPSinkApp::checkConnect(VoIPPacket *vp)
             && vp->getCodec() == curConn.codec
             && vp->getSampleBits() == curConn.sampleBits
             && vp->getSampleRate() == curConn.sampleRate
-            && vp->getSamplesPerPackets() == curConn.samplesPerPackets
+            && vp->getSamplesPerPacket() == curConn.samplesPerPacket
             && vp->getTransmitBitrate() == curConn.transmitBitrate
             && vp->getSeqNo() > curConn.seqNo
             && vp->getTimeStamp() > curConn.timeStamp
             ;
 }
 
-void VoIPSinkApp::closeConnect()
+void VoIPSinkApp::closeConnection()
 {
     if (!curConn.offline)
     {
@@ -196,7 +196,7 @@ void VoIPSinkApp::handleVoIPMessage(VoIPPacket *vp)
     if (ok)
         decodePacket(vp);
 
-	delete vp;
+    delete vp;
 }
 
 void VoIPSinkApp::decodePacket(VoIPPacket *vp)
@@ -207,7 +207,7 @@ void VoIPSinkApp::decodePacket(VoIPPacket *vp)
             emit(packetHasVoiceSignal, 1);
             break;
 
-        case SILENT:
+        case SILENCE:
             emit(packetHasVoiceSignal, 0);
             break;
 
@@ -236,6 +236,6 @@ void VoIPSinkApp::decodePacket(VoIPPacket *vp)
 
 void VoIPSinkApp::finish()
 {
-	ev << "Sink finish()" << endl;
-	closeConnect();
+    ev << "Sink finish()" << endl;
+    closeConnection();
 }

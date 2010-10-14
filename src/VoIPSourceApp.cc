@@ -248,8 +248,8 @@ VoIPPacket* VoIPSourceApp::generatePacket()
 
     if (isSilent)
     {
-        vp->setName("SILENT");
-        vp->setType(SILENT);
+        vp->setName("SILENCE");
+        vp->setType(SILENCE);
         vp->setByteLength(voipHeaderSize);
     }
     else
@@ -264,7 +264,7 @@ VoIPPacket* VoIPSourceApp::generatePacket()
     vp->setCodec(pEncoderCtx->codec_id);
     vp->setSampleRate(sampleRate);
     vp->setSampleBits(bitsPerSample);
-    vp->setSamplesPerPackets(samplesPerPacket);
+    vp->setSamplesPerPacket(samplesPerPacket);
     vp->setTransmitBitrate(compressedBitRate);
 
     pktID++;

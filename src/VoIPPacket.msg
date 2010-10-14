@@ -22,23 +22,29 @@ cplusplus {{
 
 class ByteArrayMessage;
 
+//
+// For the type field of VoIPPacket
+//
 enum VoIPPacketType
 {
     VOICE = 1;
-    SILENT = 2;
+    SILENCE = 2;
 }
 
+//
+// Packet type used by VoIPSourceApp and VoIPSinkApp
+//
 packet VoIPPacket extends ByteArrayMessage
 {
     int type @enum(VoIPPacketType);
 
-    int codec;
+    int codec;  // FFmpeg identifier of the codec
     short sampleBits;
     int sampleRate;
     int transmitBitrate;
-    int samplesPerPackets;
+    int samplesPerPacket;
 
-    uint16_t seqNo;
-    uint32_t timeStamp;
-    uint32_t ssrc;
+    uint16_t seqNo; // packet sequence number
+    uint32_t timeStamp; // increased with every packet
+    uint32_t ssrc;  // currently unused
 }

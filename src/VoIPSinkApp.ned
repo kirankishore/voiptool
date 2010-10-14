@@ -21,6 +21,17 @@ package voiptool;
 import inet.applications.udpapp.UDPApp;
 
 
+//
+// VoIPSinkApp listens on an UDP port, and expects to receive VoIP packets on
+// it. The received voice is then saved into a result audio file that can be
+// compared with the original for further evaluation. VoIP packets are
+// numbered, and out-of-order packets are discarded (the corresponding voice
+// interval will be recorded as silence into the file). VoIP packets that miss
+// their deadlines will similarly be discarded. It is assumed that the audio is
+// played back with delay (by default 20ms), which allows some jitter for the
+// incoming packets. The resulting audio file is closed when the simulation
+// completes (i.e. in the OMNeT++ finish() function).
+//
 simple VoIPSinkApp like UDPApp
 {
     parameters:

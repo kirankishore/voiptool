@@ -43,7 +43,7 @@ class VoIPSinkApp : public UDPAppBase
   public:
     VoIPSinkApp() { resultFile = ""; }
     ~VoIPSinkApp();
-	
+
   protected:
     virtual void initialize();
     virtual void handleMessage(cMessage *msg);
@@ -51,10 +51,10 @@ class VoIPSinkApp : public UDPAppBase
 
     virtual bool createConnect(VoIPPacket *vp);
     virtual bool checkConnect(VoIPPacket *vp);
-    virtual void closeConnect();
+    virtual void closeConnection();
     virtual void handleVoIPMessage(VoIPPacket *vp);
     virtual void decodePacket(VoIPPacket *vp);
-    static void initialiseStatistics();
+    static void initSignals();
 
     class Connection
     {
@@ -73,7 +73,7 @@ class VoIPSinkApp : public UDPAppBase
         enum CodecID codec;
         short sampleBits;
         int sampleRate;
-        int samplesPerPackets;
+        int samplesPerPacket;
         int transmitBitrate;
         simtime_t lastPacketFinish;
         AVFormatContext *oc;
