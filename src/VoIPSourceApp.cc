@@ -274,7 +274,7 @@ VoIPPacket* VoIPSourceApp::generatePacket()
     vp->setCodec(pEncoderCtx->codec_id);
     vp->setSampleRate(sampleRate);
     vp->setSampleBits(pEncoderCtx->bits_per_coded_sample);
-    vp->setSamplesPerPackets(samplesPerPacket);
+    vp->setSamplesPerPacket(samplesPerPacket);
     vp->setTransmitBitrate(compressedBitRate);
 
     pktID++;
