@@ -222,8 +222,6 @@ VoIPPacket* VoIPSourceApp::generatePacket()
 
     short int bitsPerInSample = av_get_bits_per_sample_format(pEncoderCtx->sample_fmt);
     short int bitsPerOutSample = av_get_bits_per_sample(pEncoderCtx->codec->id);
-    if (!bitsPerOutSample)
-        bitsPerOutSample = bitsPerInSample;
     int samples = std::min(sampleBuffer.length() / (bitsPerInSample/8), samplesPerPacket);
     bool isSilent = checkSilence(pEncoderCtx->sample_fmt, sampleBuffer.readPtr(), samples);
     VoIPPacket *vp = new VoIPPacket();
@@ -236,17 +234,23 @@ VoIPPacket* VoIPSourceApp::generatePacket()
     }
     else
     {
-        int encoderBufSize = (int)(compressedBitRate * SIMTIME_DBL(packetTimeLength)) / 8;
-        outBuf = new uint8_t[encoderBufSize+256];
-        memset(outBuf, 0, encoderBufSize+256);
+        int encoderBufSize = samples * bitsPerOutSample/8 + 256;
+        outBuf = new uint8_t[encoderBufSize];
+        memset(outBuf, 0, encoderBufSize);
 
         // FFMPEG doc bug:
-        // When codec is pcm or g726, the return value is count of output bytes,
+        // When codec is PCM, the return value is count of output bytes,
         // and read (buf_size/(av_get_bits_per_sample(avctx->codec->id)/8)) samples from input buffer
-        outByteCount = avcodec_encode_audio(pEncoderCtx, outBuf, samples * bitsPerOutSample/8, (short int*)(sampleBuffer.readPtr()));
+        // When codec is g726, the return value is count of output bytes,
+        // and read buf_size samples from input buffer
+
+        // The bitsPerOutSample is not 0 when codec is PCM.
+        int buf_size = (bitsPerOutSample) ? samples * bitsPerOutSample / 8 : samples;
+        outByteCount = avcodec_encode_audio(pEncoderCtx, outBuf, buf_size, (short int*)(sampleBuffer.readPtr()));
         if (outByteCount <= 0)
             error("avcodec_encode_audio() error: %d", outByteCount);
-        outFile.write(sampleBuffer.readPtr(), outByteCount);
+
+        outFile.write(sampleBuffer.readPtr(), samples * bitsPerInSample/8);
         sampleBuffer.notifyRead(samples * bitsPerInSample/8);
     }
 

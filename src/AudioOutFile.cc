@@ -120,9 +120,14 @@ bool AudioOutFile::write(void *decBuf, int pktBytes)
 
     av_init_packet(&pkt);
 
-    // the 3rd parameter of avcodec_encode_audio() is the size of INPUT buffer!!!
-    // It's wrong in the FFMPEG documentation/header file!!!
-    pkt.size = avcodec_encode_audio(c, outbuf, pktBytes, (short int*)decBuf);
+    short int bitsPerInSample = av_get_bits_per_sample_format(c->sample_fmt);
+    short int bitsPerOutSample = av_get_bits_per_sample(c->codec->id);
+    // FFMPEG doc bug:
+    // When codec is pcm or g726, the return value is count of output bytes,
+    // and read (buf_size/(av_get_bits_per_sample(avctx->codec->id)/8)) samples from input buffer
+    int samples = pktBytes * 8 / bitsPerInSample;
+    int buf_size = (bitsPerOutSample) ? samples * bitsPerOutSample / 8 : samples;
+    pkt.size = avcodec_encode_audio(c, outbuf, buf_size, (short int*)decBuf);
     if (c->coded_frame->pts != AV_NOPTS_VALUE)
         pkt.pts= av_rescale_q(c->coded_frame->pts, c->time_base, audio_st->time_base);
     pkt.flags |= PKT_FLAG_KEY;
