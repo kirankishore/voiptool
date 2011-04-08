@@ -17,9 +17,10 @@
 //
 
 
-package voiptool;
+package voiptool.applications.voiptool;
 
-import inet.applications.udpapp.UDPApp;
+import inet.applications.IUDPApp;
+
 
 //
 // VoIPSourceApp accepts an audio file and a destination IP address/port as
@@ -33,7 +34,7 @@ import inet.applications.udpapp.UDPApp;
 // does not simulate any particular VoIP protocol (e.g. RTP), but instead 
 // accepts a "header size" parameter that can be set accordingly.
 //
-simple VoIPSourceApp like UDPApp
+simple VoIPSourceApp like IUDPApp
 {
     // the traffic parameters
     parameters:

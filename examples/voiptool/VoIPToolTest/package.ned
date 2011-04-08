@@ -1,3 +1,3 @@
-package VoIPToolTest;
+package voiptool.VoIPToolTest;
 
 @license(LGPL);

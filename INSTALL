@@ -15,6 +15,7 @@ to be installed on your system. On Ubuntu, this package can be installed with th
 following command:
 
 $ sudo apt-get install libavcodec-dev
+$ sudo apt-get install libavformat-dev
 
 The package name and installation command may vary for other Linux systems.
 

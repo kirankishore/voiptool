@@ -11,12 +11,12 @@
 // See the GNU Lesser General Public License for more details.
 //
 
-package VoIPToolTrafficTest;
+package voiptool.VoIPToolTrafficTest;
 
 import inet.nodes.inet.StandardHost;
 import inet.nodes.inet.Router;
 import inet.nodes.ethernet.EtherSwitch;
-import inet.networklayer.autorouting.FlatNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.FlatNetworkConfigurator;
 
 
 channel line1 extends ned.DatarateChannel

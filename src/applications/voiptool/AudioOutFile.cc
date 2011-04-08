@@ -21,9 +21,6 @@
 
 #include "INETEndians.h"
 
-// FIXME check on WINDOWS!!
-#define INT64_C(x) int64_t(x##ULL)
-// FIXME check on WINDOWS!!
 
 void AudioOutFile::addAudioStream(enum CodecID codec_id, int sampleRate, short int sampleBits)
 {

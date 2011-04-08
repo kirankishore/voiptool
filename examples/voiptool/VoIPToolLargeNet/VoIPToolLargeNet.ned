@@ -17,13 +17,13 @@
 //
 
 
-package VoIPToolLargeNet;
+package voiptool.VoIPToolLargeNet;
 
 import ned.DatarateChannel;
 import inet.nodes.inet.StandardHost;
 import inet.nodes.ethernet.EtherSwitch;
 import inet.nodes.ethernet.EtherHost;
-import inet.networklayer.autorouting.FlatNetworkConfigurator;
+import inet.networklayer.autorouting.ipv4.FlatNetworkConfigurator;
 import inet.linklayer.ethernet.EtherHub;
 import inet.linklayer.ethernet.EtherBus;
 

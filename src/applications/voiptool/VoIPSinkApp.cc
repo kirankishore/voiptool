@@ -21,9 +21,6 @@
 
 #include "INETEndians.h"
 
-// FIXME check on WINDOWS!!
-#define INT64_C(x) int64_t(x##ULL)
-// FIXME check on WINDOWS!!
 
 Define_Module(VoIPSinkApp);
 
@@ -228,7 +225,7 @@ void VoIPSinkApp::decodePacket(VoIPPacket *vp)
     }
     emit(delaySignal, curConn.lastPacketFinish - vp->getCreationTime());
     curConn.seqNo = newSeqNo;
-    int len = vp->getDataArraySize();
+    int len = vp->getByteArray().getDataArraySize();
     uint8_t buff[len];
     vp->copyDataToBuffer(buff, len);
     curConn.writeAudioFrame(buff, len);

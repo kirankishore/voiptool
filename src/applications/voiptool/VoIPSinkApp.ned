@@ -16,9 +16,9 @@
 // along with this program; if not, see <http://www.gnu.org/licenses/>.
 //
 
-package voiptool;
+package voiptool.applications.voiptool;
 
-import inet.applications.udpapp.UDPApp;
+import inet.applications.IUDPApp;
 
 
 //
@@ -32,19 +32,19 @@ import inet.applications.udpapp.UDPApp;
 // incoming packets. The resulting audio file is closed when the simulation
 // completes (i.e. in the OMNeT++ finish() function).
 //
-simple VoIPSinkApp like UDPApp
+simple VoIPSinkApp like IUDPApp
 {
     parameters:
         int localPort;
         double delay @unit(s) = default(20ms);
         string resultFile;
-        @statistic[receivedBytes](title="received bytes";unit=B;record=vector,sum);
-        @statistic[lostSamples](title="lost samples";interpolationmode=none;record=vector,stats);
-        @statistic[lostPackets](title="lost packets";interpolationmode=none;record=vector,stats);
-        @statistic[droppedBytes](title="dropped bytes";interpolationmode=none;unit=B;record=vector,stats);
-        @statistic[packetHasVoice](title="Voice/Silent";record=vector,stats);
-        @statistic[connState](title="Connection state";interpolationmode=sample-hold;record=vector,stats);
-        @statistic[delay](title="delay";unit=s;record=vector,stats);
+        @statistic[receivedBytes](title="received bytes"; unit=B; record=vector,sum);
+        @statistic[lostSamples](title="lost samples"; interpolationmode=none; record=vector,stats);
+        @statistic[lostPackets](title="lost packets"; interpolationmode=none; record=vector,stats);
+        @statistic[droppedBytes](title="dropped bytes"; interpolationmode=none; unit=B; record=vector,stats);
+        @statistic[packetHasVoice](title="Voice/Silent"; record=vector,stats);
+        @statistic[connState](title="Connection state"; interpolationmode=sample-hold; record=vector,stats);
+        @statistic[delay](title="delay"; unit=s; record=vector,stats);
     gates:
         input udpIn;
         output udpOut;
